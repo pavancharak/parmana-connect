@@ -12,10 +12,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "start": "node dist/main.js",
-    "migrate": "node dist/migrate.js"
+    "migrate": "node dist/migrate.js",
+    "mcp": "node dist/mcp-main.js"
   },
   "license": "Apache-2.0",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@parmana/crypto": "0.1.0",
     "@parmana/envelope-verifier": "0.1.0",
     "@parmana/execution-system": "0.1.0",
