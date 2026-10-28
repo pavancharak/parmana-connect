@@ -7,6 +7,7 @@ interface Seen {
   method: string | undefined;
   url: string | undefined;
   headers: IncomingMessage["headers"];
+  body: string;
 }
 
 const TOKEN = "pat-test-SECRET-123";
@@ -21,20 +22,26 @@ let seen: Seen[] = [];
 let otherSeen: Seen[] = [];
 let slow = false;
 
-function record(log: Seen[], req: IncomingMessage) {
-  log.push({ method: req.method, url: req.url, headers: req.headers });
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
 }
 
 beforeAll(async () => {
-  other = createServer((req, res) => {
-    record(otherSeen, req);
+  other = createServer(async (req, res) => {
+    otherSeen.push({ method: req.method, url: req.url, headers: req.headers, body: await readBody(req) });
     res.end("{}");
   });
   await new Promise<void>((resolve) => other.listen(0, "127.0.0.1", resolve));
   otherUrl = `http://127.0.0.1:${(other.address() as AddressInfo).port}`;
 
-  server = createServer((req: IncomingMessage, res: ServerResponse) => {
-    record(seen, req);
+  server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    const body = await readBody(req);
+    seen.push({ method: req.method, url: req.url, headers: req.headers, body });
     const url = new URL(req.url ?? "/", "http://x");
     if (slow) return; // never answers; the connector must time out
     if (url.pathname.startsWith("/redirect")) {
@@ -44,6 +51,10 @@ beforeAll(async () => {
     if (url.pathname.startsWith("/missing")) {
       res.writeHead(404, { "Content-Type": "application/json" });
       return res.end('{"message":"not found"}');
+    }
+    if (url.pathname.startsWith("/fail")) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      return res.end('{"message":"internal detail"}');
     }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ path: url.pathname, query: Object.fromEntries(url.searchParams) }));
@@ -85,6 +96,21 @@ function manifest(overrides: { credential?: unknown; capabilities?: unknown[] } 
   };
 }
 
+const updateDeal = {
+  id: "hubspot:deal-update",
+  method: "PATCH",
+  path: "/crm/v3/objects/deals/{dealId}",
+  effect: "write",
+  input: {
+    dealId: { type: "string", required: true },
+    properties: { type: "object", required: true },
+  },
+};
+
+function writeManifest(capability: Record<string, unknown>) {
+  return manifest({ capabilities: [capability] });
+}
+
 async function expectConnectorError(promise: Promise<unknown>, code: string, fragment?: string) {
   const err = await promise.then(
     () => {
@@ -106,21 +132,21 @@ describe("construction", () => {
     expect(seen).toHaveLength(0);
   });
 
-  it("declares only read capabilities", () => {
+  it("declares every capability in the manifest, read and write", () => {
     const connector = createGenericConnector(
       manifest({
         capabilities: [
           { id: "hubspot:deal-fetch", method: "GET", path: "/deals", effect: "read" },
-          { id: "hubspot:deal-update", method: "PATCH", path: "/deals", effect: "write", input: { x: { type: "string" } } },
+          updateDeal,
         ],
       }),
       { allowInsecureBaseUrl: true },
     );
-    expect(connector.capabilities).toEqual(["hubspot:deal-fetch"]);
+    expect(connector.capabilities).toEqual(["hubspot:deal-fetch", "hubspot:deal-update"]);
   });
 });
 
-describe("execute: success", () => {
+describe("execute: reads", () => {
   it("sends a GET with the path parameter, query and bearer token, and returns the body", async () => {
     const connector = createGenericConnector(manifest(), { allowInsecureBaseUrl: true });
     const result = await connector.execute(
@@ -137,6 +163,7 @@ describe("execute: success", () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]?.method).toBe("GET");
     expect(seen[0]?.headers.authorization).toBe(`Bearer ${TOKEN}`);
+    expect(seen[0]?.body).toBe("");
   });
 
   it("sends a header credential under the declared header name", async () => {
@@ -156,6 +183,120 @@ describe("execute: success", () => {
   });
 });
 
+describe("execute: writes", () => {
+  it("sends a PATCH with the path parameter in the URL and the other inputs as a JSON body", async () => {
+    const connector = createGenericConnector(writeManifest(updateDeal), { allowInsecureBaseUrl: true });
+    const result = await connector.execute(
+      { capability: "hubspot:deal-update", parameters: { dealId: "123", properties: { amount: "5000" } } },
+      context,
+    );
+
+    expect(result.metadata.status).toBe(200);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.method).toBe("PATCH");
+    expect(seen[0]?.url).toBe("/crm/v3/objects/deals/123");
+    expect(seen[0]?.headers["content-type"]).toBe("application/json");
+    expect(seen[0]?.headers.authorization).toBe(`Bearer ${TOKEN}`);
+    // The path parameter stays in the URL and is not repeated in the body.
+    expect(JSON.parse(seen[0]?.body ?? "")).toEqual({ properties: { amount: "5000" } });
+  });
+
+  it("sends a DELETE's inputs in the query string, with no body", async () => {
+    const connector = createGenericConnector(
+      writeManifest({
+        id: "hubspot:deal-delete",
+        method: "DELETE",
+        path: "/crm/v3/objects/deals/{dealId}",
+        effect: "write",
+        input: { dealId: { type: "string", required: true }, archived: { type: "boolean" } },
+      }),
+      { allowInsecureBaseUrl: true },
+    );
+    await connector.execute({ capability: "hubspot:deal-delete", parameters: { dealId: "9", archived: true } }, context);
+    expect(seen[0]?.method).toBe("DELETE");
+    expect(seen[0]?.url).toBe("/crm/v3/objects/deals/9?archived=true");
+    expect(seen[0]?.body).toBe("");
+    expect(seen[0]?.headers["content-type"]).toBeUndefined();
+  });
+
+  it("sends an empty JSON object when a write has only path inputs", async () => {
+    const connector = createGenericConnector(
+      writeManifest({
+        id: "hubspot:deal-archive",
+        method: "POST",
+        path: "/crm/v3/objects/deals/{dealId}/archive",
+        effect: "write",
+        input: { dealId: { type: "string", required: true } },
+      }),
+      { allowInsecureBaseUrl: true },
+    );
+    await connector.execute({ capability: "hubspot:deal-archive", parameters: { dealId: "9" } }, context);
+    expect(seen[0]?.method).toBe("POST");
+    expect(seen[0]?.url).toBe("/crm/v3/objects/deals/9/archive");
+    expect(seen[0]?.body).toBe("{}");
+  });
+
+  it("refuses a write with a missing required input before any network call", async () => {
+    const connector = createGenericConnector(writeManifest(updateDeal), { allowInsecureBaseUrl: true });
+    await expectConnectorError(
+      connector.execute({ capability: "hubspot:deal-update", parameters: { dealId: "123" } }, context),
+      "invalid_input",
+      'input "properties" is required',
+    );
+    expect(seen).toHaveLength(0);
+  });
+
+  it("refuses a write whose body input has the wrong type, before any network call", async () => {
+    const connector = createGenericConnector(writeManifest(updateDeal), { allowInsecureBaseUrl: true });
+    await expectConnectorError(
+      connector.execute({ capability: "hubspot:deal-update", parameters: { dealId: "123", properties: "amount=5000" } }, context),
+      "invalid_input",
+      'input "properties" must be object',
+    );
+    expect(seen).toHaveLength(0);
+  });
+
+  it("refuses a write with an undeclared field, so it cannot smuggle extra data into the body", async () => {
+    const connector = createGenericConnector(writeManifest(updateDeal), { allowInsecureBaseUrl: true });
+    await expectConnectorError(
+      connector.execute(
+        { capability: "hubspot:deal-update", parameters: { dealId: "123", properties: {}, owner: "someone-else" } },
+        context,
+      ),
+      "invalid_input",
+      'input "owner" is not declared',
+    );
+    expect(seen).toHaveLength(0);
+  });
+
+  it("reports a write the upstream rejects, without echoing its body", async () => {
+    const connector = createGenericConnector(
+      writeManifest({ ...updateDeal, path: "/fail/{dealId}" }),
+      { allowInsecureBaseUrl: true },
+    );
+    const err = await expectConnectorError(
+      connector.execute({ capability: "hubspot:deal-update", parameters: { dealId: "1", properties: {} } }, context),
+      "upstream_error",
+      "returned status 500",
+    );
+    expect(err.message).not.toContain("internal detail");
+    expect(seen).toHaveLength(1);
+  });
+
+  it("refuses to follow a redirect on a write, so the token and the body never reach another host", async () => {
+    const connector = createGenericConnector(
+      writeManifest({ ...updateDeal, path: "/redirect/{dealId}" }),
+      { allowInsecureBaseUrl: true },
+    );
+    await expectConnectorError(
+      connector.execute({ capability: "hubspot:deal-update", parameters: { dealId: "1", properties: { stage: "won" } } }, context),
+      "upstream_error",
+      "redirects are refused",
+    );
+    expect(otherSeen).toHaveLength(0);
+  });
+});
+
 describe("execute: refused before any network call", () => {
   it("refuses a capability the manifest does not declare", async () => {
     const connector = createGenericConnector(manifest(), { allowInsecureBaseUrl: true });
@@ -163,23 +304,6 @@ describe("execute: refused before any network call", () => {
       connector.execute({ capability: "hubspot:deal-delete", parameters: {} }, context),
       "unknown_capability",
       "hubspot:deal-delete",
-    );
-    expect(seen).toHaveLength(0);
-  });
-
-  it("refuses a write capability, which this version does not run", async () => {
-    const connector = createGenericConnector(
-      manifest({
-        capabilities: [
-          { id: "hubspot:deal-update", method: "PATCH", path: "/deals/{dealId}", effect: "write", input: { dealId: { type: "string", required: true } } },
-        ],
-      }),
-      { allowInsecureBaseUrl: true },
-    );
-    await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-update", parameters: { dealId: "1" } }, context),
-      "unsupported_effect",
-      "write capabilities are not supported yet",
     );
     expect(seen).toHaveLength(0);
   });

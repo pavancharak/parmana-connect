@@ -27,7 +27,6 @@ export interface ConnectorResponse {
 
 export type ConnectorErrorCode =
   | "unknown_capability"
-  | "unsupported_effect"
   | "invalid_input"
   | "credential_invalid"
   | "upstream_error"
@@ -54,13 +53,15 @@ export interface GenericConnectorOptions extends ValidateOptions {
 
 export interface GenericConnector {
   readonly system: string;
-  /** Read capabilities this connector can execute. */
+  /** Every capability in the manifest, read and write. */
   readonly capabilities: readonly string[];
   execute(request: ConnectorRequest, context: ConnectorExecutionContext): Promise<ConnectorResponse>;
 }
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 1_000_000;
+/** Methods whose non-path inputs travel in a JSON body; the rest use the query string. */
+const BODY_METHODS = new Set<Capability["method"]>(["POST", "PUT", "PATCH"]);
 
 /**
  * Builds a connector from a manifest. The manifest is validated here, so an
@@ -74,40 +75,41 @@ export function createGenericConnector(manifest: unknown, options: GenericConnec
   }
   const m: Manifest = result.manifest;
   const byId = new Map(m.capabilities.map((cap) => [cap.id, cap]));
-  const readIds = m.capabilities.filter((cap) => cap.effect === "read").map((cap) => cap.id);
   const doFetch = options.fetch ?? fetch;
   const defaultTimeoutMs = options.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxBytes = options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES;
 
   return {
     system: m.system,
-    capabilities: Object.freeze([...readIds]),
+    capabilities: Object.freeze(m.capabilities.map((cap) => cap.id)),
 
     async execute(request, context) {
       const cap = byId.get(request.capability);
       if (!cap) {
         throw new ConnectorError("unknown_capability", `capability "${request.capability}" is not in this manifest`);
       }
-      if (cap.effect !== "read") {
-        throw new ConnectorError("unsupported_effect", `capability "${cap.id}" is a write; write capabilities are not supported yet`);
-      }
 
+      // Every input is checked before the request is built, so a bad call never reaches the network.
       const params = checkInput(cap, request.parameters);
       const token = checkCredential(m, context.credential);
-      const url = buildUrl(m.baseUrl, cap, params);
+      const { url, body: requestBody } = buildRequest(m.baseUrl, cap, params);
       const headers = new Headers({ Accept: "application/json" });
       if (m.credential.type === "bearer") {
         headers.set("Authorization", `Bearer ${token}`);
       } else {
         headers.set(m.credential.headerName ?? "Authorization", token);
       }
+      if (requestBody !== undefined) {
+        headers.set("Content-Type", "application/json");
+      }
 
       const timeoutMs = context.timeoutMs > 0 ? context.timeoutMs : defaultTimeoutMs;
       let response: Response;
       try {
         response = await doFetch(url, {
-          method: "GET",
+          method: cap.method,
           headers,
+          body: requestBody ?? null,
           // Never follow a redirect: the credential must not reach another host.
           redirect: "error",
           signal: AbortSignal.timeout(timeoutMs),
@@ -175,10 +177,10 @@ function checkCredential(m: Manifest, credential: CredentialHandle): string {
 }
 
 /**
- * Fills {path} parameters (URL-encoded) and sends the remaining declared
- * inputs as query parameters.
+ * Fills {path} parameters (URL-encoded). The remaining declared inputs go in
+ * a JSON body for POST, PUT and PATCH, and in the query string otherwise.
  */
-function buildUrl(baseUrl: string, cap: Capability, params: Record<string, unknown>): string {
+function buildRequest(baseUrl: string, cap: Capability, params: Record<string, unknown>): { url: string; body: string | undefined } {
   const remaining = { ...params };
   const path = cap.path.replace(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g, (_, name: string) => {
     const value = remaining[name];
@@ -187,11 +189,19 @@ function buildUrl(baseUrl: string, cap: Capability, params: Record<string, unkno
   });
 
   const url = new URL(baseUrl.replace(/\/$/, "") + path);
+  if (BODY_METHODS.has(cap.method)) {
+    const body: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(remaining)) {
+      if (value !== undefined) body[name] = value;
+    }
+    return { url: url.toString(), body: JSON.stringify(body) };
+  }
+
   for (const [name, value] of Object.entries(remaining)) {
     if (value === undefined) continue;
     url.searchParams.set(name, typeof value === "string" ? value : JSON.stringify(value));
   }
-  return url.toString();
+  return { url: url.toString(), body: undefined };
 }
 
 function toTransportError(err: unknown, timeoutMs: number): ConnectorError {
