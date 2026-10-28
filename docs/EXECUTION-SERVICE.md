@@ -54,6 +54,21 @@ The caller passes these options to `createExecutionService`:
 
 The process also needs `PARMANA_POLICY_DIR` set. The crypto bootstrap refuses to start without it. Any existing directory works, because the service does not read policies.
 
+## Dependencies
+
+The service depends on four published packages, all at version 0.1.0 on npm:
+
+| Package                      | Used for                                                                                |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
+| `@parmana/envelope-verifier` | Checking the signature, expiry, TTL and nonce of an authorization                       |
+| `@parmana/crypto`            | Computing the transaction hash, through `ExecutableContentHasher` and `CryptoBootstrap` |
+| `@parmana/shared`            | `toExecutableContent`, the shared content mapping that the gateway uses                 |
+| `@parmana/execution-system`  | The request and response types that `parmana-core` sends                                |
+
+Install with `npm ci` from the lock file. The lock file records the published versions only, with no local paths.
+
+If `node_modules/@parmana` contains symlinks into another checkout, the tests run against that checkout, not the published packages. Delete `node_modules` and reinstall. This happened once during the switch from local links to published versions, and the tests passed against the local code until it was fixed. To check, run `node -p "require(./node_modules/@parmana/shared/package.json).version"`. It should print `0.1.0`.
+
 ## Tests
 
 - `tests/execution-service.test.ts` signs real authorizations with `AuthorizationSigner` and calls the service over HTTP. It covers a valid request, a missing or wrong bearer token, a missing authorization, tampered parameters, a replay, an authorization for a different action, a signature from another key, and connector input that fails its schema.
@@ -67,13 +82,11 @@ Run `npx vitest run`. At the last run there were 59 tests in four files, and all
 - **Expiry has no test in this repository.** The envelope verifier's own tests cover it.
 - **Policy is not re-evaluated.** The service trusts the signed approval, as the protocol intends. Parmana's own policy decision is the only policy check.
 - **No entry point or configuration loader.** Nothing starts the server or reads the bearer token, the public key or the credential from the environment yet.
-- **Development links.** `package.json` links four `@parmana/*` packages with `file:` paths into a sibling `parmana-core` checkout. Replace them with published versions before merging.
+- **Development links** are gone. The four `@parmana/*` dependencies are published 0.1.0 versions.
 
 ## Publishing status of the core packages
 
-`@parmana/shared`, `@parmana/crypto` and `@parmana/envelope-verifier` 0.1.0 are on npm. `@parmana/execution-system` 0.1.0 was published but is waiting for approval on npm's website. Until it is approved, the registry shows the placeholder `0.0.0-stage`.
-
-## Why there is no Python version
+All four core packages are on npm at 0.1.0: `@parmana/shared`, `@parmana/crypto`, `@parmana/envelope-verifier` and `@parmana/execution-system`.
 
 The four core packages are TypeScript internals of the Parmana server, published so this service can depend on them. The Python SDK (`parmana`) already covers client use and offline verification, and `parmana-verifier` on PyPI checks trust records.
 
