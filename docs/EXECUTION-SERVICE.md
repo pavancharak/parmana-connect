@@ -52,7 +52,35 @@ The caller passes these options to `createExecutionService`:
 - `nonceStore`: optional. The default is `MemoryNonceStore`.
 - `timeoutMs` and `maxBodyBytes`: optional.
 
-The process also needs `PARMANA_POLICY_DIR` set. The crypto bootstrap refuses to start without it. Any existing directory works, because the service does not read policies.
+## Running it
+
+The program is `src/main.ts`, started with `npm start` after `npm run build`. It reads these environment variables and refuses to start if a required one is missing or invalid. The error names the variable, never its value.
+
+| Variable                       | Required        | Meaning                                                           |
+| ------------------------------ | --------------- | ----------------------------------------------------------------- |
+| `PARMANA_SERVICE_BEARER_TOKEN` | yes             | Shared secret that `parmana-core` sends. At least 32 characters.  |
+| `PARMANA_PUBLIC_KEY_FILE`      | yes             | Path to Parmana's Ed25519 public key, in PEM.                     |
+| `PARMANA_CONNECTOR_MANIFEST`   | yes             | Path to the connector manifest (JSON or YAML).                    |
+| `<secretRef>`                  | yes             | The upstream secret. Its name is the `secretRef` in the manifest. |
+| `PARMANA_POLICY_DIR`           | yes             | Any existing directory. The crypto bootstrap requires it.         |
+| `PARMANA_NONCE_STORE`          | no              | `postgres` (default) or `memory`.                                 |
+| `PARMANA_DATABASE_URL`         | with `postgres` | Connection string for the nonce database.                         |
+| `PARMANA_SERVICE_PORT`         | no              | Default 8080.                                                     |
+| `PARMANA_CONNECTOR_TIMEOUT_MS` | no              | Default 10000.                                                    |
+
+### Replay protection
+
+With `postgres`, every instance records each used nonce in the `parmana_connect_nonces` table, and a repeated nonce is refused whichever instance receives it. Create the table once, before the first start, with `npm run migrate` and `PARMANA_DATABASE_URL` set.
+
+With `memory`, replay protection lives in one process. A restart, or a second instance, accepts an approval that was already used. Use it only for local development, and say so explicitly.
+
+### Startup
+
+```bash
+npm run build
+npm run migrate
+npm start
+```
 
 ## Dependencies
 
@@ -78,10 +106,10 @@ Run `npx vitest run`. At the last run there were 59 tests in four files, and all
 
 ## Known gaps
 
-- **Replay memory is in process.** A restart or a second instance accepts an approval that was already used. A shared nonce store is needed before running more than one instance.
+- **Replay protection depends on the store.** With the default `postgres` store it holds across restarts and instances. With `memory` it does not.
 - **Expiry has no test in this repository.** The envelope verifier's own tests cover it.
 - **Policy is not re-evaluated.** The service trusts the signed approval, as the protocol intends. Parmana's own policy decision is the only policy check.
-- **No entry point or configuration loader.** Nothing starts the server or reads the bearer token, the public key or the credential from the environment yet.
+- **Startup** reads its configuration from the environment, as described above. It has not been run against a live `parmana-core` deployment yet.
 - **Development links** are gone. The four `@parmana/*` dependencies are published 0.1.0 versions.
 
 ## Publishing status of the core packages
