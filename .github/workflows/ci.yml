@@ -18,9 +18,6 @@ jobs:
 
     env:
       NODE_ENV: test
-      # Required by @parmana/shared's config loader, which the crypto bootstrap
-      # calls. The directory only needs to exist; the service does not read policies.
-      PARMANA_POLICY_DIR: ${{ runner.temp }}/parmana-policies
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -32,8 +29,13 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
+      # Required by @parmana/shared's config loader, which the crypto bootstrap
+      # calls. The directory only needs to exist; the service does not read policies.
       - name: Create the policy directory
-        run: mkdir -p "$PARMANA_POLICY_DIR"
+        run: |
+          dir="$RUNNER_TEMP/parmana-policies"
+          mkdir -p "$dir"
+          echo "PARMANA_POLICY_DIR=$dir" >> "$GITHUB_ENV"
 
       - name: Install from the lock file
         run: npm ci
