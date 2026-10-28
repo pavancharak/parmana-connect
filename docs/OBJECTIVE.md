@@ -83,7 +83,7 @@ The generic connector implements the connector contract that `parmana-core` alre
 
 1. takes a validated manifest and an incoming request for one capability,
 2. checks the input against that capability's schema,
-3. resolves the credential through the credential provider, for one use only,
+3. uses the credential it is handed for this one call. The caller resolves it from the secret store, as `parmana-core` does, so the connector never looks up secrets itself,
 4. sends the HTTP request and returns the result in the shape the gateway expects.
 
 It does not decide whether the call is allowed. The call only reaches it after Parmana's policy has approved it.
