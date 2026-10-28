@@ -40,6 +40,7 @@ function env(overrides: Record<string, string | undefined> = {}): Record<string,
     PARMANA_PUBLIC_KEY_FILE: "/keys/parmana.pem",
     PARMANA_CONNECTOR_MANIFEST: "/manifest.json",
     HUBSPOT_TOKEN: "upstream-secret",
+    PARMANA_DATABASE_URL: "postgres://user:pass@127.0.0.1:5432/parmana",
     ...overrides,
   };
 }
@@ -62,6 +63,23 @@ describe("loadServiceConfig", () => {
     expect(config.timeoutMs).toBe(10_000);
     expect(config.credentialVariable).toBe("HUBSPOT_TOKEN");
     expect(config.manifest.system).toBe("hubspot");
+    expect(config.nonceStore).toBe("postgres");
+    expect(config.databaseUrl).toBe("postgres://user:pass@127.0.0.1:5432/parmana");
+  });
+
+  it("uses the memory store only when it is asked for by name, and then needs no database", () => {
+    const config = loadServiceConfig(env({ PARMANA_NONCE_STORE: "memory", PARMANA_DATABASE_URL: undefined }), readers);
+
+    expect(config.nonceStore).toBe("memory");
+    expect(config.databaseUrl).toBeUndefined();
+  });
+
+  it("refuses the postgres store when no database URL is set", () => {
+    expect(refusal({ PARMANA_DATABASE_URL: undefined })).toBe("PARMANA_DATABASE_URL is required");
+  });
+
+  it("refuses an unknown nonce store name", () => {
+    expect(refusal({ PARMANA_NONCE_STORE: "redis" })).toBe("PARMANA_NONCE_STORE must be postgres or memory");
   });
 
   it("refuses a missing bearer token and names the variable", () => {

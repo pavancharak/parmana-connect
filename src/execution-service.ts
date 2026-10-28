@@ -28,7 +28,7 @@ export interface ExecutionServiceOptions {
   readonly credentialId: string;
   readonly timeoutMs?: number;
   /** Must be shared across instances to prevent replay across them. */
-  readonly nonceStore?: NonceStore;
+  readonly nonceStore?: NonceStore | undefined;
   readonly maxBodyBytes?: number;
 }
 

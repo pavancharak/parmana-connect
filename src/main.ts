@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
 
+import { Pool } from "pg";
+
 import { loadServiceConfig, ConfigError } from "./config.js";
 import { createGenericConnector } from "./connector.js";
 import { createExecutionService } from "./execution-service.js";
+import { PostgresNonceStore } from "./postgres-nonce-store.js";
 
 /**
  * Starts the execution service from environment variables. It exits with a
@@ -14,6 +17,10 @@ async function main(): Promise<void> {
   });
 
   const connector = createGenericConnector(config.manifest);
+  const nonceStore =
+    config.nonceStore === "postgres" && config.databaseUrl !== undefined
+      ? new PostgresNonceStore(new Pool({ connectionString: config.databaseUrl }))
+      : undefined;
   const service = createExecutionService({
     bearerToken: config.bearerToken,
     publicKey: config.publicKey,
@@ -27,6 +34,7 @@ async function main(): Promise<void> {
     },
     credentialId: config.credentialVariable,
     timeoutMs: config.timeoutMs,
+    nonceStore,
   });
 
   await service.listen(config.port);

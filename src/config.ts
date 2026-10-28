@@ -15,6 +15,10 @@ export interface ServiceConfig {
   /** Name of the environment variable that holds the upstream secret. */
   readonly credentialVariable: string;
   readonly timeoutMs: number;
+  /** postgres: a database shared by every instance. memory: one process only. */
+  readonly nonceStore: "postgres" | "memory";
+  /** Set when nonceStore is postgres. */
+  readonly databaseUrl?: string | undefined;
 }
 
 export interface ConfigReaders {
@@ -52,7 +56,10 @@ export function loadServiceConfig(
   const port = parseInteger(env.PARMANA_SERVICE_PORT ?? "8080", "PARMANA_SERVICE_PORT", 1, 65535);
   const timeoutMs = parseInteger(env.PARMANA_CONNECTOR_TIMEOUT_MS ?? "10000", "PARMANA_CONNECTOR_TIMEOUT_MS", 100, 120_000);
 
-  return { port, bearerToken, publicKey, manifest, credentialVariable, timeoutMs };
+  const nonceStore = parseNonceStore(env.PARMANA_NONCE_STORE);
+  const databaseUrl = nonceStore === "postgres" ? required(env, "PARMANA_DATABASE_URL") : undefined;
+
+  return { port, bearerToken, publicKey, manifest, credentialVariable, timeoutMs, nonceStore, databaseUrl };
 }
 
 export class ConfigError extends Error {
@@ -81,6 +88,16 @@ function parsePublicKey(pem: string, name: string): KeyObject {
     if (err instanceof ConfigError) throw err;
     throw new ConfigError(`${name} is not a valid PEM public key`);
   }
+}
+
+/**
+ * Defaults to postgres. The memory store must be asked for by name, because it
+ * does not share replay protection between instances.
+ */
+function parseNonceStore(raw: string | undefined): "postgres" | "memory" {
+  if (raw === undefined || raw === "postgres") return "postgres";
+  if (raw === "memory") return "memory";
+  throw new ConfigError("PARMANA_NONCE_STORE must be postgres or memory");
 }
 
 function parseInteger(raw: string, name: string, min: number, max: number): number {
