@@ -1,2 +1,9 @@
 node_modules/
 dist/
+
+# Local secrets and keys. Never commit these.
+.env
+.env.*
+!.env.example
+keys/
+*.pem
