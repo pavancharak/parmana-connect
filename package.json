@@ -18,7 +18,8 @@
     "yaml": "^2.9.1",
     "@parmana/envelope-verifier": "file:../parmana-core/packages/envelope-verifier",
     "@parmana/crypto": "file:../parmana-core/packages/crypto",
-    "@parmana/shared": "file:../parmana-core/packages/shared"
+    "@parmana/shared": "file:../parmana-core/packages/shared",
+    "@parmana/execution-system": "file:../parmana-core/packages/execution-system"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
