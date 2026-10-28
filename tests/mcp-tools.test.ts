@@ -82,6 +82,7 @@ describe("toolsFor", () => {
         target: { type: "string", minLength: 1, description: expect.any(String) },
         dealId: { type: "string" },
         properties: { type: "object" },
+        signals: { type: "object", description: expect.any(String) },
       },
       required: ["target", "dealId", "properties"],
       additionalProperties: false,
@@ -205,5 +206,32 @@ describe("callTool: Parmana unreachable", () => {
     const parmana = new ParmanaClient({ baseUrl: "https://parmana.example", apiKey: KEY, fetch: failing });
 
     await expect(callTool(manifest, context(parmana), "hubspot:deal-update", ARGS)).rejects.toBeInstanceOf(ParmanaUnavailableError);
+  });
+});
+
+describe("callTool: signals", () => {
+  it("sends the signals the caller supplies, unchanged, and not as parameters", async () => {
+    const { calls, parmana } = stubParmana({ status: 200, body: {} });
+    const signals = { note: "hello", receiptApproved: true, approvalArtifact: { signature: "abc" } };
+    await callTool(manifest, context(parmana), "hubspot:deal-update", { ...ARGS, signals });
+
+    const sent = calls[1]?.body as Record<string, any>;
+    expect(sent.signals).toEqual(signals);
+    expect(sent.intent.parameters).toEqual({ dealId: "123", properties: { dealstage: "won" } });
+  });
+
+  it("sends empty signals when none are supplied", async () => {
+    const { calls, parmana } = stubParmana({ status: 200, body: {} });
+    await callTool(manifest, context(parmana), "hubspot:deal-update", ARGS);
+
+    expect((calls[1]?.body as Record<string, any>).signals).toEqual({});
+  });
+
+  it("refuses signals that are not an object, before anything is sent", async () => {
+    const { calls, parmana } = stubParmana({ status: 200, body: {} });
+    const result = await callTool(manifest, context(parmana), "hubspot:deal-update", { ...ARGS, signals: "approved" });
+
+    expect(result.content[0]?.text).toBe("signals must be an object.");
+    expect(calls).toHaveLength(0);
   });
 });

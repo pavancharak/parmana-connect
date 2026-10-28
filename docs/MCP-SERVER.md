@@ -27,6 +27,7 @@ Each capability in the manifest is one tool, named by its id, for example `hubsp
 
 - `target`: what the action applies to, for example `crm/deals/123`. Required.
 - The capability's own inputs, with their declared types. Anything else is refused before a request is sent.
+- `signals` (optional): facts and signed approvals the policy requires, sent to Parmana unchanged. It must be an object. The approval comes from the person who approves the action; the server never creates one.
 
 ## What each call does
 
@@ -51,6 +52,15 @@ If Parmana cannot be reached, the result says that the call did not complete and
 
 ## Known gaps
 
-- **Signals are sent empty.** A policy that needs facts in `signals` will refuse the call. Supplying them needs a design decision.
+- **Signals are the caller's responsibility.** The server passes them through unchecked, so a policy that needs a signal the caller does not supply will refuse the call.
 - **Input is checked by Parmana and the connector, not by the MCP layer alone** beyond the names and required fields.
 - **No live test against Parmana yet.** The tests use a stub of its API. Test against a sandbox with a real key before use.
+
+## Sandbox check
+
+The public sandbox has one action, `sandbox:receipt`, and a demo key. To try the approved path:
+
+1. `POST /sandbox/approvals` with `{ "capability": "sandbox:receipt", "resourceId": "<target>" }` returns a demo approval, valid for five minutes and accepted once.
+2. Call the tool with `target` set to the same resource, `note`, and `signals: { note, receiptApproved: true, approvalArtifact: <the approval> }`.
+
+Without an approval, the sandbox refuses the call with `POLICY_DENIED`, which is what the server reports. On 2026-10-28 a release with an approval reached the sandbox, but the sandbox failed to record the outcome, because its `execution_outcomes` table does not exist there. The server correctly reported the outcome as unknown and said not to resend. The intent shows `ERRORED`, so the sandbox needs that table created.

@@ -45,6 +45,10 @@ export function toolsFor(manifest: Manifest): ToolDefinition[] {
 function inputSchemaFor(cap: Capability): Record<string, unknown> {
   const properties: Record<string, unknown> = {
     target: { type: "string", minLength: 1, description: "What the action applies to, for example crm/deals/123." },
+    signals: {
+      type: "object",
+      description: "Facts and signed approvals the policy requires, passed through unchanged. Get them from the person who approves the action.",
+    },
   };
   const required = ["target"];
   for (const [name, field] of Object.entries(cap.input ?? {})) {
@@ -71,7 +75,7 @@ export async function callTool(
   const cap = manifest.capabilities.find((c) => c.id === name);
   if (cap === undefined) return failure(`Unknown tool "${name}".`);
 
-  const { target, parameters, problem } = splitArguments(cap, args);
+  const { target, parameters, signals, problem } = splitArguments(cap, args);
   if (problem !== undefined) return failure(problem);
 
   const now = (ctx.now ?? (() => new Date()))();
@@ -109,8 +113,7 @@ export async function callTool(
       createdAt: now.toISOString(),
     },
     policy: policy.policy,
-    // Signals the policy requires must be supplied by the deployment. None are sent here yet.
-    signals: {},
+    signals,
   };
 
   const response = await ctx.parmana.execute(body);
@@ -120,23 +123,27 @@ export async function callTool(
 function splitArguments(
   cap: Capability,
   args: Record<string, unknown>,
-): { target: string; parameters: Record<string, unknown>; problem?: string } {
-  const { target, ...rest } = args;
+): { target: string; parameters: Record<string, unknown>; signals: Record<string, unknown>; problem?: string } {
+  const { target, signals: rawSignals, ...rest } = args;
   if (typeof target !== "string" || target.trim() === "") {
-    return { target: "", parameters: {}, problem: "target is required and must be a non-empty string." };
+    return { target: "", parameters: {}, signals: {}, problem: "target is required and must be a non-empty string." };
   }
+  if (rawSignals !== undefined && (typeof rawSignals !== "object" || rawSignals === null || Array.isArray(rawSignals))) {
+    return { target, parameters: {}, signals: {}, problem: "signals must be an object." };
+  }
+  const signals = (rawSignals ?? {}) as Record<string, unknown>;
   const declared = cap.input ?? {};
   for (const key of Object.keys(rest)) {
     if (!Object.prototype.hasOwnProperty.call(declared, key)) {
-      return { target, parameters: {}, problem: `"${key}" is not an input of ${cap.id}.` };
+      return { target, parameters: {}, signals: {}, problem: `"${key}" is not an input of ${cap.id}.` };
     }
   }
   for (const [key, field] of Object.entries(declared)) {
     if (field.required === true && rest[key] === undefined) {
-      return { target, parameters: {}, problem: `"${key}" is required.` };
+      return { target, parameters: {}, signals: {}, problem: `"${key}" is required.` };
     }
   }
-  return { target, parameters: rest };
+  return { target, parameters: rest, signals };
 }
 
 function outcome(status: number, body: unknown, id: string): ToolResult {
