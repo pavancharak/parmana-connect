@@ -1,0 +1,43 @@
+name: DCO
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  dco:
+    name: DCO
+    # Dependabot's commits carry no sign-off; its pull requests are reviewed by the dependency rules instead.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Every commit has a Signed-off-by line
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for commit in $(git rev-list --no-merges "$BASE_SHA..$HEAD_SHA"); do
+            if ! git show -s --format=%B "$commit" | grep -q -E '^Signed-off-by: .+ <.+>$'; then
+              missing+=("$commit")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "These commits have no Signed-off-by line. Add one with: git commit -s --amend (or rebase with --signoff)."
+            for commit in "${missing[@]}"; do
+              git show -s --format='%h %s' "$commit"
+            done
+            exit 1
+          fi
+          echo "Every commit is signed off."
