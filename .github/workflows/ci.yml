@@ -1,0 +1,50 @@
+name: CI
+
+# Installs from the lock file, then runs the build, the typecheck and the full
+# test suite on every pull request and on every push to main.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      # Required by @parmana/shared's config loader, which the crypto bootstrap
+      # calls. The directory only needs to exist; the service does not read policies.
+      - name: Create the policy directory
+        run: |
+          dir="$RUNNER_TEMP/parmana-policies"
+          mkdir -p "$dir"
+          echo "PARMANA_POLICY_DIR=$dir" >> "$GITHUB_ENV"
+
+      - name: Install from the lock file
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npx vitest run
