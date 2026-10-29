@@ -9,6 +9,8 @@ import { loadManifest, type Manifest } from "./manifest.js";
  */
 export interface ServiceConfig {
   readonly port: number;
+  /** Address to bind. 127.0.0.1 unless PARMANA_SERVICE_HOST says otherwise. */
+  readonly host: string;
   readonly bearerToken: string;
   readonly publicKey: KeyObject;
   readonly manifest: Manifest;
@@ -54,12 +56,13 @@ export function loadServiceConfig(
   required(env, credentialVariable);
 
   const port = parseInteger(env.PARMANA_SERVICE_PORT ?? "8080", "PARMANA_SERVICE_PORT", 1, 65535);
+  const host = env.PARMANA_SERVICE_HOST ?? "127.0.0.1";
   const timeoutMs = parseInteger(env.PARMANA_CONNECTOR_TIMEOUT_MS ?? "10000", "PARMANA_CONNECTOR_TIMEOUT_MS", 100, 120_000);
 
   const nonceStore = parseNonceStore(env.PARMANA_NONCE_STORE);
   const databaseUrl = nonceStore === "postgres" ? required(env, "PARMANA_DATABASE_URL") : undefined;
 
-  return { port, bearerToken, publicKey, manifest, credentialVariable, timeoutMs, nonceStore, databaseUrl };
+  return { port, host, bearerToken, publicKey, manifest, credentialVariable, timeoutMs, nonceStore, databaseUrl };
 }
 
 export class ConfigError extends Error {
