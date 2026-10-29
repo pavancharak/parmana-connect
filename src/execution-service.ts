@@ -76,6 +76,7 @@ export function createExecutionService(options: ExecutionServiceOptions) {
     const check = await verifyExternalRelease(body, {
       publicKey: options.publicKey,
       audience: options.releaseAudience,
+      capabilities: options.connector.capabilities,
       now: new Date(),
       nonceStore: releaseNonceStore,
     });

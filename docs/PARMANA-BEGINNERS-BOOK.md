@@ -132,7 +132,7 @@ docker compose ps postgres
 
 Expected from the last command: a line with `Up ... (healthy)` and `127.0.0.1:55432->5432/tcp`. The first time it can take a minute.
 
-Why: the API keeps its data here. The database user and password come from `docker-compose.yml`. The password `parmana-local` is a local default only.
+Why: the API keeps its data here. The database user and password come from `docker-compose.yml`. The password is a local default only. Find its value there, under `PARMANA_DB_PASSWORD`, and use it in the next step in place of `<LOCAL_DB_PASSWORD>`.
 
 ### 5.2 Create the `.env` file for the API
 
@@ -144,7 +144,7 @@ notepad .env
 In Notepad, find the line `DATABASE_URL=` and replace it with:
 
 ```
-DATABASE_URL=postgresql://parmana:parmana-local@127.0.0.1:55432/parmana
+DATABASE_URL=postgresql://parmana:<LOCAL_DB_PASSWORD>@127.0.0.1:55432/parmana
 ```
 
 Save the file and close Notepad.

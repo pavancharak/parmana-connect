@@ -102,7 +102,7 @@ If `node_modules/@parmana` contains symlinks into another checkout, the tests ru
 - `tests/execution-service.test.ts` signs real authorizations with `AuthorizationSigner` and calls the service over HTTP. It covers a valid request, a missing or wrong bearer token, a missing authorization, tampered parameters, a replay, an authorization for a different action, a signature from another key, and connector input that fails its schema.
 - `tests/e2e-parmana-core.test.ts` sends requests with `parmana-core`'s own `HttpExecutionSystem` and signs them with its `AuthorizationSigner`. It covers an approved action, changed parameters, a replay, and a wrong bearer token.
 
-Run `npx vitest run`. At the last run there were 59 tests in four files, and all passed.
+Run `npx vitest run`. At the last run, with `PARMANA_TEST_DATABASE_URL` set to a local PostgreSQL 16 database, there were 108 tests in ten files, and all passed. Without that variable, the 5 PostgreSQL tests in `tests/postgres-nonce-store.test.ts` are skipped and the other 103 pass.
 
 ## Known gaps
 

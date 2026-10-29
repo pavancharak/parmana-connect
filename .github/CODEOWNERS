@@ -1,0 +1,19 @@
+# Code owners review changes to the paths below. GitHub applies the last
+# matching rule, so the catch-all comes first and specific paths after it.
+
+* @pavancharak
+
+# The service's trust boundary: release and authorization verification, the
+# replay store, and configuration.
+/src/execution-service.ts @pavancharak
+/src/external-release.ts @pavancharak
+/src/postgres-nonce-store.ts @pavancharak
+/src/config.ts @pavancharak
+
+# The generic connector makes the upstream calls with the credential.
+/src/connector.ts @pavancharak
+
+# CI, release and supply-chain configuration.
+/.github/ @pavancharak
+/package.json @pavancharak
+/package-lock.json @pavancharak

@@ -1,0 +1,17 @@
+{
+  "system": "httpbin",
+  "baseUrl": "https://httpbin.org",
+  "apiVersion": "1",
+  "credential": {
+    "type": "bearer",
+    "secretRef": "HTTPBIN_TOKEN"
+  },
+  "capabilities": [
+    {
+      "id": "httpbin:get",
+      "method": "GET",
+      "path": "/get",
+      "effect": "read"
+    }
+  ]
+}

@@ -336,7 +336,7 @@ docker compose ps postgres
 
 Expected last line: `Up ... (healthy)` with port `127.0.0.1:55432->5432/tcp`.
 
-The database user, password and name come from `docker-compose.yml`: `parmana`, `parmana-local` (the default for `PARMANA_DB_PASSWORD`), `parmana`. The password is a local default, not a production secret.
+The database user, password and name come from `docker-compose.yml`: `parmana`, the password in `PARMANA_DB_PASSWORD` (its local default is set in `docker-compose.yml`), `parmana`. That password is a local default, not a production secret. Replace `<LOCAL_DB_PASSWORD>` in the next step with that value.
 
 ### C2. Create `.env`
 
@@ -348,7 +348,7 @@ notepad .env
 In Notepad, replace the `DATABASE_URL=` line with:
 
 ```
-DATABASE_URL=postgresql://parmana:parmana-local@127.0.0.1:55432/parmana
+DATABASE_URL=postgresql://parmana:<LOCAL_DB_PASSWORD>@127.0.0.1:55432/parmana
 ```
 
 Save as UTF-8.
