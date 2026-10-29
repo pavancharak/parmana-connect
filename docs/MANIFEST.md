@@ -72,4 +72,4 @@ Its capability is `example:get-thing`. Calling it with `{"id": "abc", "expand": 
 
 ## Where the manifest is kept
 
-`PARMANA_CONNECTOR_MANIFEST` is a path, read at startup. The repository does not include a manifest. `.env.example` names `manifests\httpbin.json`, a folder that is not in this repository, so the file must be created or copied from elsewhere before the service can start.
+`PARMANA_CONNECTOR_MANIFEST` is a path, read at startup. `.env.example` points it at `manifests\httpbin.json`, and the repository includes that file. It describes `httpbin:get`, a read of `https://httpbin.org/get`, with its token in `HTTPBIN_TOKEN`. Parmana's `httpbin-read` policy must send only the parameters that manifest declares; the manifest declares none, so a release with parameters is refused by the connector.

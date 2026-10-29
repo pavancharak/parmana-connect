@@ -38,10 +38,10 @@ The other fields (`connectorId`, `authorizationId`, `policy`, `approvedBy`, `iss
 ### Checks
 
 1. The endpoint has a release audience (`PARMANA_RELEASE_AUDIENCE`). If not, the answer is `503`, and the service runs nothing.
-2. Every shape, signature, audience and expiry check runs, and a refused release lists every reason found.
+2. Every shape, signature, audience, capability and expiry check runs, and a refused release lists every reason found.
 3. The key `release:<businessTransactionId>` is recorded in the replay store before the connector runs. A second release with the same id is refused with `this businessTransactionId was already executed`.
 
-The release's `capability` is not compared with the capabilities the endpoint serves before the connector runs. The generic connector rejects an unknown capability, but only after the replay record has been written. See [Known differences](#known-differences).
+The release's `capability` must be one the endpoint serves, the capabilities of the manifest. A release for any other capability is refused with `403` (`release.capability "..." is not served by this endpoint`) before its replay record is written, so the same release can be sent again with a corrected capability and a fresh signature.
 
 ### Answers
 
@@ -130,6 +130,5 @@ The service writes to stdout with `console.log` and `console.error`. It does not
 
 ## Known differences
 
-- **Capability check for releases.** A release naming a capability the endpoint does not serve is refused by the connector, after its replay record is written. The release is then used up. The result is `200` with `success: false`. Checking the capability before the replay record would avoid that.
 - **Error detail.** The caller gets only the connector's error code. The connector's message is not logged, unlike the connectors repository's service.
 - **Body too large.** Returns `400`, not `413`.

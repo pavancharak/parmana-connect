@@ -115,6 +115,8 @@ Start the MCP server with `npm run mcp`.
 | `src/config.ts`, `src/mcp-config.ts`               | Environment configuration, which refuses invalid values                                           |
 | `src/main.ts`, `src/mcp-main.ts`, `src/migrate.ts` | Entry points                                                                                      |
 | `scripts/signed-request.mjs`                       | Sends one signed request to a running service, for a quick check                                  |
+| `manifests/httpbin.json`                           | The manifest `.env.example` points to: one read capability, `httpbin:get`                         |
+| `.github/CODEOWNERS`, `.github/dependabot.yml`     | Code owners for sensitive paths, and weekly dependency updates                                    |
 | `tests/`                                           | Unit and integration tests                                                                        |
 
 ## Status

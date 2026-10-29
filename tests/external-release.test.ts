@@ -57,7 +57,13 @@ function signed(
 }
 
 function options(nonceStore = new MemoryNonceStore()) {
-  return { publicKey, audience: AUDIENCE, now: NOW, nonceStore };
+  return {
+    publicKey,
+    audience: AUDIENCE,
+    capabilities: ["httpbin:get"],
+    now: NOW,
+    nonceStore,
+  };
 }
 
 describe("verifyExternalRelease", () => {
@@ -134,6 +140,32 @@ describe("verifyExternalRelease", () => {
 
     const inSkew = signed(release({ expiresAt: "2026-10-29T05:59:45.000Z" }));
     expect((await verifyExternalRelease(inSkew, options())).valid).toBe(true);
+  });
+
+  it("refuses a capability this endpoint does not serve, and leaves its replay record unused", async () => {
+    const store = new MemoryNonceStore();
+    const unserved = signed(
+      release({
+        capability: "httpbin:delete",
+        businessTransactionId: "99999999-8888-4777-8666-555555555555",
+      }),
+    );
+
+    const check = await verifyExternalRelease(unserved, options(store));
+    expect(check).toEqual({
+      valid: false,
+      errors: [
+        'release.capability "httpbin:delete" is not served by this endpoint',
+      ],
+    });
+
+    // The refusal happened before the replay write, so the same id is still fresh.
+    expect(
+      await store.checkAndRecord(
+        "release:99999999-8888-4777-8666-555555555555",
+        "2099-01-01T00:00:00.000Z",
+      ),
+    ).toBe(true);
   });
 
   it("refuses a release that is not a release", async () => {

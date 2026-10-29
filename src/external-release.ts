@@ -54,6 +54,8 @@ export interface ExternalReleaseOptions {
   readonly publicKey: KeyObject;
   /** This endpoint's URL, exactly as it is registered in parmana-core. */
   readonly audience: string;
+  /** The capabilities this endpoint serves. A release for any other is refused. */
+  readonly capabilities: readonly string[];
   readonly now: Date;
   readonly nonceStore: NonceStore;
 }
@@ -67,8 +69,9 @@ export function isSignedExternalRelease(
 
 /**
  * Verifies a signed release. Returns the release only when every check passes.
- * The replay record is written last, so a release that fails any other check
- * does not use up its businessTransactionId.
+ * The replay record is written last, so a release that fails any other check,
+ * including a capability this endpoint does not serve, does not use up its
+ * businessTransactionId.
  */
 export async function verifyExternalRelease(
   body: SignedExternalRelease,
@@ -87,6 +90,12 @@ export async function verifyExternalRelease(
     errors.push("signature.value must be a string");
   } else if (!signatureVerifies(options.publicKey, signature.value, release)) {
     errors.push("the signature does not verify");
+  }
+
+  if (!options.capabilities.includes(release.capability)) {
+    errors.push(
+      `release.capability ${JSON.stringify(release.capability ?? null)} is not served by this endpoint`,
+    );
   }
 
   if (release.audience !== options.audience) {
