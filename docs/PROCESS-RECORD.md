@@ -330,6 +330,7 @@ If it still returns `401`, check the other possibility: the public key. The Rend
 | 7 | Check Dependabot alert #5 is closed | You | Open https://github.com/pavancharak/parmana-core/security/dependabot/5 |
 | 8 | Decide whether to pay for Render (Starter, $7/month) to avoid the sleep | You | Free tier sleeps |
 | 9 | Decide when to rotate `default.private.pem` (new key pair created 2026-10-29) | You | Old key is in `default.public.pem.bak` |
+| 10 | Run the end-to-end test through local `parmana-core`. Blocked: `connector-capability` 1.1.0 has rules only for `crm:read` and `payments:refund`, so `httpbin:get` falls through to `reject-default`. Next: add a rule for `httpbin:get` through the policy change flow (maker, checker, step-up), then send an action through `parmana-core` `/execute` | You, with me | The connector is registered and approved in the local API: change `a03974db-e207-4961-97d0-0647de802707`, status active. Approval of the policy change needs a second human and a step-up key |
 
 ---
 
