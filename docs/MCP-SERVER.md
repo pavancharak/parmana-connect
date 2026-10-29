@@ -23,9 +23,9 @@ The authority and authorization are set once, in configuration. An agent cannot 
 
 ## Tools
 
-Each capability in the manifest is one tool, named by its id, for example `hubspot:deal-update`. The tool takes:
+Each capability in the manifest is one tool, named by its id, for example `example:item-update`. The tool takes:
 
-- `target`: what the action applies to, for example `crm/deals/123`. Required.
+- `target`: what the action applies to, for example `items/123`. Required.
 - The capability's own inputs, with their declared types. Anything else is refused before a request is sent.
 - `signals` (optional): facts and signed approvals the policy requires, sent to Parmana unchanged. It must be an object. The approval comes from the person who approves the action; the server never creates one.
 

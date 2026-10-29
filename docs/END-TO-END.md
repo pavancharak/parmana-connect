@@ -6,7 +6,7 @@ This guide follows one action from an agent's request to a signed record. It cov
 
 ```
 agent
-  │  calls a tool, e.g. hubspot:deal-update
+  │  calls a tool, e.g. example:item-update
   ▼
 MCP server (this repo, npm run mcp)
   │  1. GET  /policies/in-effect?capability=…       read the policy and version now in effect
@@ -24,7 +24,7 @@ execution service (this repo, npm start)
 generic connector (this repo)
   │  checks the input against the manifest, then calls the upstream API
   ▼
-upstream system (for example HubSpot)
+upstream system (for example, a CRM)
 ```
 
 The result travels back along the same path. Parmana writes a signed Execution Trust Record for each release, and the agent receives its summary.
@@ -39,31 +39,31 @@ Two rules hold throughout:
 A manifest describes one system: its base URL, how to authenticate, and its capabilities. The schema is `schema/manifest.schema.json`.
 
 ```yaml
-system: hubspot
+system: example
 baseUrl: https://api.hubapi.com
 apiVersion: v3
 credential:
   type: bearer
-  secretRef: HUBSPOT_TOKEN
+  secretRef: EXAMPLE_TOKEN
 capabilities:
-  - id: hubspot:deal-fetch
+  - id: example:item-fetch
     method: GET
-    path: /crm/v3/objects/deals/{dealId}
+    path: /items/{itemId}
     effect: read
     input:
-      dealId: { type: string, required: true }
-  - id: hubspot:deal-update
+      itemId: { type: string, required: true }
+  - id: example:item-update
     method: PATCH
-    path: /crm/v3/objects/deals/{dealId}
+    path: /items/{itemId}
     effect: write
     input:
-      dealId: { type: string, required: true }
+      itemId: { type: string, required: true }
       properties: { type: object, required: true }
 ```
 
 The rules, enforced when the manifest is loaded:
 
-- Capability ids start with the system name, for example `hubspot:…`, and no id repeats.
+- Capability ids start with the system name, for example `example:…`, and no id repeats.
 - `GET` capabilities are `read`. A `write` capability declares its inputs.
 - Every `{name}` in a path is a required input.
 - The base URL is `https://`, with no credentials, query or fragment.
@@ -83,7 +83,7 @@ The service receives approved requests from Parmana. Its settings come from the 
 | `PARMANA_SERVICE_BEARER_TOKEN`               | Shared secret that Parmana sends. At least 32 characters.                             |
 | `PARMANA_PUBLIC_KEY_FILE`                    | Path to Parmana's Ed25519 public key, in PEM.                                         |
 | `PARMANA_CONNECTOR_MANIFEST`                 | Path to the manifest from step 2.                                                     |
-| `HUBSPOT_TOKEN` (or the name in `secretRef`) | The upstream secret.                                                                  |
+| `EXAMPLE_TOKEN` (or the name in `secretRef`) | The upstream secret.                                                                  |
 | `PARMANA_POLICY_DIR`                         | Any existing directory. The crypto bootstrap requires it.                             |
 | `PARMANA_DATABASE_URL`                       | PostgreSQL, for the shared nonce store. Required unless `PARMANA_NONCE_STORE=memory`. |
 
@@ -123,7 +123,7 @@ Agents launch it with a configuration like this (the values are yours to fill in
 ```json
 {
   "mcpServers": {
-    "parmana-hubspot": {
+    "parmana-example": {
       "command": "node",
       "args": ["/path/to/parmana-connect/dist/mcp-main.js"],
       "env": {
@@ -145,16 +145,16 @@ Each tool takes `target`, the capability's own inputs, and an optional `signals`
 
 ## 5. One call, step by step
 
-For `hubspot:deal-update` on deal 123, approved by a person:
+For `example:item-update` on item 123, approved by a person:
 
-1. The agent calls the tool with `target: "crm/deals/123"`, `dealId: "123"`, `properties: {dealstage: "won"}`, and `signals` holding the person's approval.
+1. The agent calls the tool with `target: "items/123"`, `itemId: "123"`, `properties: {stage: "won"}`, and `signals` holding the person's approval.
 2. The server validates the arguments against the manifest. An unknown or missing argument is refused here, and nothing is sent.
-3. The server reads the policy in effect for `hubspot:deal-update`.
+3. The server reads the policy in effect for `example:item-update`.
 4. The server sends one `POST /execute`, with a new business transaction id, the authority, the authorization, the intent and the policy. The id is the idempotency key.
 5. Parmana evaluates the policy and checks the approval. If it refuses, the agent gets `Refused by policy. Nothing was released.` and the flow stops.
 6. If it approves, Parmana releases the action to the execution service.
 7. The service checks the signed authorization, recomputes the transaction hash, and confirms the approval covers this action. Any failure returns 403 and nothing runs.
-8. The generic connector checks the input against the manifest and calls HubSpot with the upstream credential.
+8. The generic connector checks the input against the manifest and calls the upstream system with the upstream credential.
 9. The service returns the result. Parmana signs a trust record and returns it.
 10. The agent gets the trust record as text.
 

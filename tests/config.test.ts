@@ -9,11 +9,11 @@ const { publicKey: rsaPublic } = generateKeyPairSync("rsa", { modulusLength: 204
 const rsaPem = rsaPublic.export({ type: "spki", format: "pem" }).toString();
 
 const MANIFEST = JSON.stringify({
-  system: "hubspot",
+  system: "example",
   baseUrl: "https://api.hubapi.com",
   apiVersion: "v3",
-  credential: { type: "bearer", secretRef: "HUBSPOT_TOKEN" },
-  capabilities: [{ id: "hubspot:deal-fetch", method: "GET", path: "/deals/{dealId}", effect: "read", input: { dealId: { type: "string", required: true } } }],
+  credential: { type: "bearer", secretRef: "EXAMPLE_TOKEN" },
+  capabilities: [{ id: "example:item-fetch", method: "GET", path: "/items/{itemId}", effect: "read", input: { itemId: { type: "string", required: true } } }],
 });
 
 const TOKEN = "a".repeat(32);
@@ -39,7 +39,7 @@ function env(overrides: Record<string, string | undefined> = {}): Record<string,
     PARMANA_POLICY_DIR: "/policies",
     PARMANA_PUBLIC_KEY_FILE: "/keys/parmana.pem",
     PARMANA_CONNECTOR_MANIFEST: "/manifest.json",
-    HUBSPOT_TOKEN: "upstream-secret",
+    EXAMPLE_TOKEN: "upstream-secret",
     PARMANA_DATABASE_URL: "postgres://user:pass@127.0.0.1:5432/parmana",
     ...overrides,
   };
@@ -61,8 +61,8 @@ describe("loadServiceConfig", () => {
 
     expect(config.port).toBe(8080);
     expect(config.timeoutMs).toBe(10_000);
-    expect(config.credentialVariable).toBe("HUBSPOT_TOKEN");
-    expect(config.manifest.system).toBe("hubspot");
+    expect(config.credentialVariable).toBe("EXAMPLE_TOKEN");
+    expect(config.manifest.system).toBe("example");
     expect(config.nonceStore).toBe("postgres");
     expect(config.databaseUrl).toBe("postgres://user:pass@127.0.0.1:5432/parmana");
   });
@@ -105,7 +105,7 @@ describe("loadServiceConfig", () => {
   });
 
   it("refuses to start when the upstream secret is not set", () => {
-    expect(refusal({ HUBSPOT_TOKEN: undefined })).toBe("HUBSPOT_TOKEN is required");
+    expect(refusal({ EXAMPLE_TOKEN: undefined })).toBe("EXAMPLE_TOKEN is required");
   });
 
   it("refuses a port outside the valid range", () => {

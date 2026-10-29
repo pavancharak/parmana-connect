@@ -18,9 +18,9 @@ process.env.PARMANA_POLICY_DIR ??= mkdtempSync(join(tmpdir(), "parmana-policies-
 
 const BEARER = "service-bearer-test";
 const SECRET = "upstream-secret-XYZ";
-const ACTION = "hubspot:deal-fetch";
-const TARGET = "crm/deals/123";
-const PARAMETERS = { dealId: "123" };
+const ACTION = "example:item-fetch";
+const TARGET = "items/123";
+const PARAMETERS = { itemId: "123" };
 const TRANSACTION = "txn-service-1";
 
 const crypto = CryptoBootstrap.create();
@@ -46,17 +46,17 @@ beforeAll(async () => {
 
   const connector = createGenericConnector(
     {
-      system: "hubspot",
+      system: "example",
       baseUrl: upstreamUrl,
       apiVersion: "v3",
-      credential: { type: "bearer", secretRef: "HUBSPOT_TOKEN" },
+      credential: { type: "bearer", secretRef: "EXAMPLE_TOKEN" },
       capabilities: [
         {
           id: ACTION,
           method: "GET",
-          path: "/deals/{dealId}",
+          path: "/items/{itemId}",
           effect: "read",
-          input: { dealId: { type: "string", required: true } },
+          input: { itemId: { type: "string", required: true } },
         },
       ],
     },
@@ -68,7 +68,7 @@ beforeAll(async () => {
     publicKey,
     connector,
     resolveCredential: () => SECRET,
-    credentialId: "HUBSPOT_TOKEN",
+    credentialId: "EXAMPLE_TOKEN",
     nonceStore: new MemoryNonceStore(),
   });
   service = await handler.listen(0);
@@ -140,7 +140,7 @@ describe("execution service", () => {
     expect(result.status).toBe(200);
     expect(result.json.success).toBe(true);
     expect(result.json.businessTransactionId).toBe(TRANSACTION);
-    expect(upstreamCalls).toEqual([{ path: "/deals/123", auth: `Bearer ${SECRET}` }]);
+    expect(upstreamCalls).toEqual([{ path: "/items/123", auth: `Bearer ${SECRET}` }]);
   });
 
   it("refuses a missing bearer token before reading the request", async () => {
@@ -169,7 +169,7 @@ describe("execution service", () => {
 
   it("refuses a tampered request whose parameters differ from the approved ones", async () => {
     const { signed } = await authorize();
-    const result = await post(body(signed, { dealId: "999" }));
+    const result = await post(body(signed, { itemId: "999" }));
 
     expect(result.status).toBe(403);
     expect(result.json.checks).toEqual({ businessTransactionHashMatches: false });
@@ -187,7 +187,7 @@ describe("execution service", () => {
   });
 
   it("refuses an authorization granted for a different action", async () => {
-    const { signed } = await authorize({ grantedCapability: "hubspot:deal-update" });
+    const { signed } = await authorize({ grantedCapability: "example:item-update" });
     const result = await post(body(signed));
 
     expect(result.status).toBe(403);
