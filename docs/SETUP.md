@@ -76,6 +76,7 @@ PARMANA_CONNECTOR_MANIFEST=manifests\httpbin.json
 PARMANA_POLICY_DIR=policies
 PARMANA_NONCE_STORE=memory
 HTTPBIN_TOKEN=test-only-not-a-real-secret
+PARMANA_RELEASE_AUDIENCE=https://parmana-connect.onrender.com/execute
 "@ | Set-Content -Path .env -Encoding ascii
 ```
 
@@ -148,12 +149,14 @@ Click **Add Environment Variable** for each line below. The key goes in the left
 | ------------------------------ | ------------------------------------------------------------------ |
 | `NODE_VERSION`                 | `24`                                                               |
 | `PARMANA_SERVICE_PORT`         | `10000`                                                            |
+| `PARMANA_SERVICE_HOST`         | `0.0.0.0`                                                          |
 | `PARMANA_SERVICE_BEARER_TOKEN` | the value of `PARMANA_SERVICE_BEARER_TOKEN` from your local `.env` |
 | `PARMANA_PUBLIC_KEY_FILE`      | `/etc/secrets/parmana-public.pem`                                  |
 | `PARMANA_CONNECTOR_MANIFEST`   | `/etc/secrets/httpbin.json`                                        |
 | `PARMANA_POLICY_DIR`           | `.`                                                                |
 | `PARMANA_NONCE_STORE`          | `memory`                                                           |
 | `HTTPBIN_TOKEN`                | `test-only-not-a-real-secret`                                      |
+| `PARMANA_RELEASE_AUDIENCE`     | `https://parmana-connect.onrender.com/execute`                     |
 
 Do not use **Add from .env**, because it uploads your whole local file.
 
