@@ -79,7 +79,7 @@ Start the MCP server with `npm run mcp`.
 
 ## Deploying
 
-[`docs/SETUP.md`](docs/SETUP.md) gives the full steps for a Windows computer and for Render's free tier, including the environment variables and the secret files. Set `PARMANA_SERVICE_HOST=0.0.0.0` on a hosted service, and register the exact `/execute` URL in Parmana as the endpoint.
+[`docs/SETUP.md`](docs/SETUP.md) gives the full steps for a Windows computer and for Render's free tier, including the environment variables and the secret files. Set `PARMANA_SERVICE_HOST=0.0.0.0` on a hosted service, set the health check path to `/health`, and register the exact `/execute` URL in Parmana as the endpoint.
 
 ## Reference
 

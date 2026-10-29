@@ -97,7 +97,7 @@ npm start            # listens on PARMANA_SERVICE_PORT, default 8080
 
 If a setting is missing, the process exits with a message that names the variable. It never prints a value.
 
-**Connecting Parmana to the service.** Configure parmana-core's execution system as an HTTP execution system whose base URL is the service's address. Its requests carry the bearer token in an `Authorization` header. The service accepts `POST /execute` only. It has no health route yet.
+**Connecting Parmana to the service.** Configure parmana-core's execution system as an HTTP execution system whose base URL is the service's address. Its requests carry the bearer token in an `Authorization` header. The service accepts `POST /execute`, and answers `GET /health` with `{"status":"UP"}`.
 
 **Running more than one instance.** Each instance must point at the same `PARMANA_DATABASE_URL`. With `PARMANA_NONCE_STORE=memory`, replay protection is per process, and that setting is for local development only.
 
@@ -215,7 +215,7 @@ On 2026-10-28 step 2 reached the release, but the sandbox could not record the o
 ## 9. Known gaps
 
 - **Signals** are passed through without checks. A policy that needs a signal the caller does not supply refuses the call.
-- **The execution service has no health route** and no configuration for its own TLS. Put it behind a TLS-terminating proxy.
+- **The execution service has no configuration for its own TLS.** Put it behind a TLS-terminating proxy.
 - **Replay protection** depends on the nonce store. With `memory`, it does not hold across processes.
 - **The MCP server has not run against a production deployment.** Its live check used the sandbox, and the approved path is blocked on the sandbox side.
 - **The Python connector SDK and a Python receiving service** are not part of this repository. See [EXECUTION-SERVICE.md](EXECUTION-SERVICE.md#publishing-status-of-the-core-packages).
