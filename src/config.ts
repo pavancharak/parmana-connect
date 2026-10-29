@@ -21,6 +21,8 @@ export interface ServiceConfig {
   readonly nonceStore: "postgres" | "memory";
   /** Set when nonceStore is postgres. */
   readonly databaseUrl?: string | undefined;
+  /** The endpoint URL registered in parmana-core, for signed releases. Unset, those are refused. */
+  readonly releaseAudience?: string | undefined;
 }
 
 export interface ConfigReaders {
@@ -62,7 +64,9 @@ export function loadServiceConfig(
   const nonceStore = parseNonceStore(env.PARMANA_NONCE_STORE);
   const databaseUrl = nonceStore === "postgres" ? required(env, "PARMANA_DATABASE_URL") : undefined;
 
-  return { port, host, bearerToken, publicKey, manifest, credentialVariable, timeoutMs, nonceStore, databaseUrl };
+  const releaseAudience = optionalHttpsUrl(env, "PARMANA_RELEASE_AUDIENCE");
+
+  return { port, host, bearerToken, publicKey, manifest, credentialVariable, timeoutMs, nonceStore, databaseUrl, releaseAudience };
 }
 
 export class ConfigError extends Error {
@@ -107,6 +111,22 @@ function parseInteger(raw: string, name: string, min: number, max: number): numb
   const value = Number(raw);
   if (!Number.isInteger(value) || value < min || value > max) {
     throw new ConfigError(`${name} must be an integer from ${min} to ${max}`);
+  }
+  return value;
+}
+
+/** An optional https URL. Unset or empty returns undefined. Anything else stops startup and names the variable. */
+function optionalHttpsUrl(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  const value = env[name];
+  if (value === undefined || value === "") return undefined;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new ConfigError(`${name} must be an absolute https URL.`);
+  }
+  if (url.protocol !== "https:") {
+    throw new ConfigError(`${name} must use https://.`);
   }
   return value;
 }

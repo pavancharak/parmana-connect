@@ -6,6 +6,15 @@ import { EnvelopeVerifier, MemoryNonceStore, type NonceStore } from "@parmana/en
 import { toExecutableContent, type SignedExecutionAuthorization } from "@parmana/shared";
 
 import { ConnectorError, type GenericConnector } from "./connector.js";
+import {
+  isSignedExternalRelease,
+  verifyExternalRelease,
+  type ExternalRelease,
+  type SignedExternalRelease,
+} from "./external-release.js";
+
+/** Largest result parmana-core accepts from an external endpoint, in bytes. */
+const EXTERNAL_RESULT_LIMIT_BYTES = 16 * 1024;
 
 /**
  * Receiving side of a Parmana authorization. parmana-core's HttpExecutionSystem
@@ -30,6 +39,13 @@ export interface ExecutionServiceOptions {
   /** Must be shared across instances to prevent replay across them. */
   readonly nonceStore?: NonceStore | undefined;
   readonly maxBodyBytes?: number;
+  /**
+   * This endpoint's URL exactly as it is registered in parmana-core, for
+   * example https://parmana-connect.onrender.com/execute. A signed release
+   * is refused unless its audience equals this value. Unset, the service
+   * refuses signed releases with 503.
+   */
+  readonly releaseAudience?: string | undefined;
 }
 
 const DEFAULT_MAX_BODY_BYTES = 256 * 1024;
@@ -43,24 +59,87 @@ export interface ExecutionServiceRequest {
 }
 
 export function createExecutionService(options: ExecutionServiceOptions) {
+  const releaseNonceStore = options.nonceStore ?? new MemoryNonceStore();
   const verifier = new EnvelopeVerifier({
     publicKey: options.publicKey,
-    nonceStore: options.nonceStore ?? new MemoryNonceStore(),
+    nonceStore: releaseNonceStore,
   });
   const hasher = new ExecutableContentHasher(CryptoBootstrap.create());
   const expectedAuthorization = Buffer.from(`Bearer ${options.bearerToken}`);
+
+  const handleExternalRelease = async (body: SignedExternalRelease, res: ServerResponse): Promise<void> => {
+    if (options.releaseAudience === undefined) {
+      return send(res, 503, { error: "this endpoint has no release audience configured" });
+    }
+
+    // No bearer token here: the signature is the authentication.
+    const check = await verifyExternalRelease(body, {
+      publicKey: options.publicKey,
+      audience: options.releaseAudience,
+      now: new Date(),
+      nonceStore: releaseNonceStore,
+    });
+    if (!check.valid) {
+      return send(res, 403, { error: "release refused", errors: check.errors });
+    }
+
+    return answerRelease(check.release, res);
+  };
+
+  const answerRelease = async (release: ExternalRelease, res: ServerResponse): Promise<void> => {
+    let success: boolean;
+    let result: Record<string, unknown>;
+
+    try {
+      const response = await options.connector.execute(
+        { capability: release.capability, parameters: release.parameters as Record<string, unknown> },
+        {
+          credential: {
+            providerId: "execution-service",
+            credentialId: options.credentialId,
+            value: options.resolveCredential(),
+          },
+          timeoutMs: options.timeoutMs ?? 10_000,
+        },
+      );
+      success = response.success;
+      result = { status: response.metadata.status, body: response.metadata.body };
+    } catch (err) {
+      success = false;
+      result = { error: connectorMessage(err) };
+    }
+
+    // parmana-core refuses a result above 16 KB. Say so here rather than let it fail there.
+    if (Buffer.byteLength(JSON.stringify(result), "utf8") > EXTERNAL_RESULT_LIMIT_BYTES) {
+      success = false;
+      result = { error: "result is larger than 16 KB" };
+    }
+
+    return send(res, 200, {
+      businessTransactionId: release.businessTransactionId,
+      capability: release.capability,
+      success,
+      result,
+      executedAt: new Date().toISOString(),
+    });
+  };
 
   const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     if (req.method !== "POST" || req.url !== "/execute") {
       return send(res, 404, { error: "not found" });
     }
-    if (!isAuthorized(req, expectedAuthorization)) {
-      return send(res, 401, { error: "unauthorized" });
-    }
 
     const body = await readJson(req, options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES);
     if (body === undefined) {
       return send(res, 400, { error: "request body must be JSON within the size limit" });
+    }
+
+    if (isSignedExternalRelease(body)) {
+      return handleExternalRelease(body, res);
+    }
+
+    if (!isAuthorized(req, expectedAuthorization)) {
+      return send(res, 401, { error: "unauthorized" });
     }
     if (body.authorization === undefined) {
       return send(res, 401, { error: "authorization required" });
