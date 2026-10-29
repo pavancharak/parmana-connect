@@ -37,7 +37,7 @@ async function main(): Promise<void> {
     nonceStore,
   });
 
-  await service.listen(config.port);
+  await service.listen(config.port, config.host);
   console.log(`execution service listening on port ${config.port}`);
 }
 
