@@ -346,7 +346,7 @@ Steps are in `docs/SETUP.md`, Part 2. The main points:
 
 - Create a **Web Service** from `pavancharak/parmana-connect`, branch `main`.
 - Build command: `npm ci && npm run build`. Start command: `npm run start`.
-- Leave the health check path empty.
+- Set the health check path to `/health`.
 - Add these environment variables:
 
 | Key | Value |

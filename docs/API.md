@@ -1,6 +1,6 @@
 # HTTP API: `POST /execute`
 
-The service has one route that does work, `POST /execute`, and no other route. Any other path or method returns `404` with `{"error":"not found"}`. The code is in `src/execution-service.ts` and `src/external-release.ts`.
+The service has one route that does work, `POST /execute`. It also answers `GET /health` with `{"status":"UP"}`, which reads no settings and checks nothing upstream. Any other path or method returns `404` with `{"error":"not found"}`. The code is in `src/execution-service.ts` and `src/external-release.ts`.
 
 The route accepts two kinds of JSON body, and tells them apart by shape:
 

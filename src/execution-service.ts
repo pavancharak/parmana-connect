@@ -126,6 +126,10 @@ export function createExecutionService(options: ExecutionServiceOptions) {
   };
 
   const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    // Reports that the process is up. It reads no settings and checks nothing upstream.
+    if (req.method === "GET" && req.url === "/health") {
+      return send(res, 200, { status: "UP" });
+    }
     if (req.method !== "POST" || req.url !== "/execute") {
       return send(res, 404, { error: "not found" });
     }

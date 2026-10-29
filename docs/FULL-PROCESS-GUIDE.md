@@ -260,7 +260,7 @@ The same service, on the internet, so `parmana-core` can reach it. Render's free
    - Language: Node
    - Build Command: `npm ci && npm run build`
    - Start Command: `npm run start`
-   - Health Check Path: **empty**. The service has no `/healthz`, so Render would mark it unhealthy.
+   - Health Check Path: `/health`. The service answers `GET /health` with `{"status":"UP"}`.
    - Instance type: **Free** (check the price line shows $0)
 
 ### B2. Environment variables

@@ -133,6 +133,17 @@ async function post(payload: unknown, token: string | null = BEARER) {
 }
 
 describe("execution service", () => {
+  it("answers GET /health with UP, without a bearer token or a body", async () => {
+    const response = await fetch(`${serviceUrl}/health`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: "UP" });
+  });
+
+  it("refuses POST /health and other GET routes", async () => {
+    expect((await fetch(`${serviceUrl}/health`, { method: "POST" })).status).toBe(404);
+    expect((await fetch(`${serviceUrl}/execute`)).status).toBe(404);
+  });
+
   it("runs the connector for a valid, signed authorization", async () => {
     const { signed } = await authorize();
     const result = await post(body(signed));

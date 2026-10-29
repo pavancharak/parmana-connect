@@ -135,7 +135,7 @@ A `401` means the bearer token check is working.
    - **Region:** any
    - **Build Command:** `npm ci && npm run build`
    - **Start Command:** `npm run start`
-   - **Health Check Path:** leave empty. The service has no `/healthz` route.
+   - **Health Check Path:** `/health`. The service answers `GET /health` with `{"status":"UP"}`.
 
 ### Step 2. Choose the free plan
 
@@ -208,5 +208,5 @@ The `parmana-public.pem` you created in Part 1 is a test key. Real requests from
 | `fetch failed` from the test script        | The service is not running. Start it with Step 7 in Part 1.                                                      |
 | `401` from the test script                 | Expected for an empty request. The service is up.                                                                |
 | Render build fails on `npm ci`             | Check that `package-lock.json` is in the repository.                                                             |
-| Render marks the service unhealthy         | The health check path is set to `/healthz`, which the service does not serve. Clear it, as in Part 2 Step 1.     |
+| Render marks the service unhealthy         | The health check path is set to `/healthz`, which the service does not serve. Set it to `/health`, as in Part 2 Step 1. |
 | Render page is slow the first time         | Free services sleep. Wait a minute and try again.                                                                |
