@@ -27,7 +27,20 @@ Get `parmana-connect` (the service that runs connector calls) reachable on the i
 
 ### Connector registration
 
-- A proposal for `httpbin:get` was created, approved by `local-approver`, and is now `active`.
+- The first registration of `httpbin:get` pointed at `https://parmana-connect.onrender.com/` (no `/execute`). Signed releases were sent to that URL and refused (`502`). Revoked.
+- The `httpbin-read` policy was proposed and approved (version 1.0.0).
+- A second registration of `httpbin:get` points at `https://parmana-connect.onrender.com/execute` under `httpbin-read`. Approved, and active.
+- Signed releases use parmana-core's external connector protocol (ADR-0013). `parmana-connect` accepts them since PR #18, and `PARMANA_RELEASE_AUDIENCE` is set on Render.
+
+### End-to-end result (2026-10-29)
+
+- A request through `parmana-core` `/execute` for `httpbin:get`, with an approval signed by `local-issuer`, returned `200`.
+- The execution is `COMPLETED`, and its verification is `VERIFIED`. The trust record and receipt are signed by `parmana-core`.
+- `parmana-connect` on Render received the release at `https://parmana-connect.onrender.com/execute`, ran the connector, and returned `200` from `httpbin.org`.
+
+### Merged in this stage
+
+- `parmana-connect` PR #17 (full process guide), #18 (external release protocol), #19 (environment variables in the setup guide).
 
 ## How and why
 
@@ -37,12 +50,11 @@ Get `parmana-connect` (the service that runs connector calls) reachable on the i
 
 ## Pending
 
-1. **Policy rule for `httpbin:get`.** Blocker. `connector-capability` only allows `crm:read` and `payments:refund`, so `parmana-core` rejects `httpbin:get`. Adding a rule is a policy change with its own approvals.
-2. **End-to-end test through `parmana-core`.** Waits on item 1.
-3. **Regenerate the proposer key.** Its raw key was shown in chat. Treat it as exposed. It works only against the local API.
-4. **Open PRs for the docs branches.** `docs/process-record-update` (commit `34110a3`) and `docs/full-process-guide` (commit `5604ea9`) are pushed but not opened as PRs. The record also needs its Prettier warning fixed.
-5. **Document `PARMANA_SERVICE_HOST`** in `docs/SETUP.md` and `docs/EXECUTION-SERVICE.md`.
-6. **Real Parmana public key.** The test key is not Parmana's. Real requests are refused until it is replaced.
-7. **Production limits.** Render's free tier sleeps after about 15 minutes idle. `PARMANA_NONCE_STORE=memory` protects only one instance from replay.
-8. **Dependabot alert #5.** Confirm it is closed.
-9. **Optional cleanup.** Delete the empty fork branch `claude/parmana-core-385-note` in `pavancharak/integrations`.
+1. **Regenerate the proposer key.** Its raw key was shown in chat several times. Treat it as exposed. It works only against the local API.
+2. **Open PRs for the docs branches.** `docs/process-record-update` (commit `34110a3`) and `docs/full-process-guide` (commit `5604ea9` was merged as PR #17). The record needs its Prettier warning fixed.
+3. **Document the release protocol** in `docs/EXECUTION-SERVICE.md`, including `PARMANA_RELEASE_AUDIENCE`.
+4. **Real Parmana public key.** The test key is not Parmana's. Real requests are refused until it is replaced.
+5. **Production limits.** Render's free tier sleeps after about 15 minutes idle. `PARMANA_NONCE_STORE=memory` protects only one instance from replay.
+6. **Approval issuer.** `local-issuer` is a local test issuer, added through maker and checker. A real deployment needs an issuer that the operator controls.
+7. **Dependabot alert #5.** Confirm it is closed.
+8. **Optional cleanup.** Delete the empty fork branch `claude/parmana-core-385-note` in `pavancharak/integrations`.
