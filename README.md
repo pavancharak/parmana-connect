@@ -1,12 +1,24 @@
 # parmana-connect
 
-Connectors and agent integration for [Parmana](https://docs.parmanasystems.com), the authorization layer for AI execution. Every action an agent takes goes through Parmana's policy check, and Parmana keeps a signed record of it.
+`parmana-connect` connects an external system to [Parmana](https://docs.parmanasystems.com), the authorization layer for AI actions. Parmana decides whether an action may run, under a versioned policy, and signs a record of the decision. This repository runs the part that performs the action: a connector, served over HTTPS, that Parmana releases approved actions to.
 
-This repository provides three things:
+It has three parts:
 
-1. **A connector manifest**: a YAML or JSON description of a REST system's capabilities. No connector code is needed.
-2. **An execution service**: the receiving side of a Parmana approval. It checks the approval, then runs the connector.
-3. **An MCP server**: exposes each capability as a tool for an agent. Every call goes to Parmana first.
+1. **A connector manifest.** A YAML or JSON file that describes an HTTP system and its capabilities, such as `httpbin:get`. A manifest needs no connector code.
+2. **A connector service.** A Node.js server with one route, `POST /execute`. It accepts two kinds of request: a signed release from Parmana, and a signed authorization with a bearer token. It verifies the request, runs the manifest's call, and answers.
+3. **An MCP server.** It exposes each capability as a tool for an AI agent. Every tool call goes to Parmana's API first.
+
+## How a request flows
+
+```
+agent ──► Parmana API ──► decision + signature ──► parmana-connect ──► upstream system
+           (policy,         (approval checked,       (verifies the          (the manifest's
+            approval)        record signed)           signature, runs it)    HTTP call)
+```
+
+Parmana checks the policy and the approval, signs the decision, and releases the action to the registered endpoint. The service verifies the release and performs the call. The result returns to Parmana, which records it. The service never decides policy, and it never sees the agent.
+
+For the protocol, read [connect any external system](https://docs.parmanasystems.com/guides/connect-any-external-system). For the service in detail, read [the parmana-connect service](https://docs.parmanasystems.com/connectors/parmana-connect).
 
 ## Quick start
 
@@ -18,29 +30,108 @@ npm run build
 npm test
 ```
 
-Tests need a PostgreSQL database for the replay-protection tests. Set `PARMANA_TEST_DATABASE_URL` to run them. Without it they are skipped.
+`npm test` runs the suite. The replay-protection tests against PostgreSQL run only when `PARMANA_TEST_DATABASE_URL` is set. Without it they are skipped, and the rest run.
+
+To start the connector service:
+
+```bash
+node --env-file=.env dist/main.js
+```
+
+`npm start` does not read `.env`, so use the command above when you rely on a `.env` file. The service listens on `127.0.0.1:8080` by default.
+
+## Configuration
+
+### The connector service
+
+| Setting                        | Required        | Default     | Purpose                                                                                                        |
+| ------------------------------ | --------------- | ----------- | -------------------------------------------------------------------------------------------------------------- |
+| `PARMANA_SERVICE_BEARER_TOKEN` | Yes             | none        | Shared secret for signed authorizations. At least 32 characters.                                               |
+| `PARMANA_PUBLIC_KEY_FILE`      | Yes             | none        | Path to Parmana's Ed25519 public key, in PEM.                                                                  |
+| `PARMANA_CONNECTOR_MANIFEST`   | Yes             | none        | Path to the manifest, JSON or YAML.                                                                            |
+| The manifest's `secretRef`     | Yes             | none        | The environment variable holding the upstream credential.                                                      |
+| `PARMANA_POLICY_DIR`           | Yes             | none        | An existing folder. Required by the crypto setup.                                                              |
+| `PARMANA_RELEASE_AUDIENCE`     | For releases    | unset       | The endpoint URL as registered in Parmana, for example `https://service.example.com/execute`. Must be `https`. |
+| `PARMANA_NONCE_STORE`          | No              | `postgres`  | `postgres` shares replay records across instances. `memory` is for one instance only.                          |
+| `PARMANA_DATABASE_URL`         | With `postgres` | none        | Connection string for the replay store.                                                                        |
+| `PARMANA_SERVICE_PORT`         | No              | `8080`      | Port to listen on.                                                                                             |
+| `PARMANA_SERVICE_HOST`         | No              | `127.0.0.1` | Address to bind. Use `0.0.0.0` on a hosted service.                                                            |
+| `PARMANA_CONNECTOR_TIMEOUT_MS` | No              | `10000`     | Timeout for the upstream call.                                                                                 |
+
+The service refuses to start when a required setting is missing, and the error names the setting but never its value.
+
+### The MCP server
+
+| Setting                         | Required | Purpose                                                 |
+| ------------------------------- | -------- | ------------------------------------------------------- |
+| `PARMANA_API_URL`               | Yes      | Parmana's API address. Must be `https`.                 |
+| `PARMANA_API_KEY`               | Yes      | The caller's key for that API.                          |
+| `PARMANA_AUTHORITY_ID`          | Yes      | The authority the calls are made under.                 |
+| `PARMANA_AUTHORITY_TYPE`        | Yes      | `USER`, `ROLE`, `SERVICE` or `ORGANIZATION`.            |
+| `PARMANA_PRINCIPAL_ID`          | Yes      | The principal the calls are made for.                   |
+| `PARMANA_AUTHORIZATION_ID`      | Yes      | The authorization the calls belong to.                  |
+| `PARMANA_AUTHORIZATION_PURPOSE` | Yes      | A short sentence stating why the actions are requested. |
+| `PARMANA_CONNECTOR_MANIFEST`    | Yes      | Path to the manifest whose capabilities become tools.   |
+| `PARMANA_SOURCE_SYSTEM`         | No       | Defaults to `parmana-connect`.                          |
+| `PARMANA_SUBMITTED_BY`          | No       | Defaults to the principal.                              |
+
+Start the MCP server with `npm run mcp`.
+
+## Deploying
+
+[`docs/SETUP.md`](docs/SETUP.md) gives the full steps for a Windows computer and for Render's free tier, including the environment variables and the secret files. Set `PARMANA_SERVICE_HOST=0.0.0.0` on a hosted service, and register the exact `/execute` URL in Parmana as the endpoint.
 
 ## Documentation
 
-- **[End-to-end guide](docs/END-TO-END.md)**: how the pieces fit together, from a manifest to a signed record, with a walkthrough against the public sandbox.
-- **[Execution service](docs/EXECUTION-SERVICE.md)**: what the service checks, its configuration, and its known gaps.
-- **[MCP server](docs/MCP-SERVER.md)**: the tools, the configuration, and each outcome an agent can see.
-- **[Objective and design](docs/OBJECTIVE.md)**: the goal, the open decisions, and the build order.
+| Document                                                                                      | For                                                                                   |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [Setup](docs/SETUP.md)                                                                        | Running the service locally and deploying it to Render, step by step                  |
+| [Local keys](docs/LOCAL-KEYS-RUNBOOK.md)                                                      | Where keys live, how they are created, rotated and checked, and the errors they cause |
+| [Execution service](docs/EXECUTION-SERVICE.md)                                                | What the service checks, its configuration, and its known limits                      |
+| [End-to-end guide](docs/END-TO-END.md)                                                        | How the pieces fit, from manifest to signed record                                    |
+| [MCP server](docs/MCP-SERVER.md)                                                              | The tools, their configuration, and each outcome an agent can see                     |
+| [Objective and design](docs/OBJECTIVE.md)                                                     | The goal, the open decisions, and the build order                                     |
+| [Beginner's book](docs/PARMANA-BEGINNERS-BOOK.md)                                             | A step-by-step guide for a new developer, with expected outcomes                      |
+| [Progress report](docs/PROGRESS-REPORT.md)                                                    | What is done, why, and what is pending                                                |
+| [Process record](docs/PROCESS-RECORD.md) and [full process guide](docs/FULL-PROCESS-GUIDE.md) | The full history of the setup, and its commands                                       |
 
 ## Layout
 
-| Path                                               | Contents                                                        |
-| -------------------------------------------------- | --------------------------------------------------------------- |
-| `schema/manifest.schema.json`                      | JSON Schema for manifests                                       |
-| `src/manifest.ts`                                  | Loads and validates manifests                                   |
-| `src/connector.ts`                                 | The generic connector: runs a manifest's capabilities over HTTP |
-| `src/execution-service.ts`                         | The receiving side: checks an approval, then runs the connector |
-| `src/postgres-nonce-store.ts`                      | Shared single-use nonce store, backed by PostgreSQL             |
-| `src/mcp-tools.ts`, `src/mcp-server.ts`            | MCP tools, built from the manifest's capabilities               |
-| `src/parmana-client.ts`                            | HTTP client for Parmana's API                                   |
-| `src/config.ts`, `src/mcp-config.ts`               | Environment-based configuration, refusing invalid values        |
-| `src/main.ts`, `src/mcp-main.ts`, `src/migrate.ts` | Entry points                                                    |
+| Path                                               | Contents                                                                                          |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `schema/manifest.schema.json`                      | JSON Schema for manifests                                                                         |
+| `src/manifest.ts`                                  | Loads and validates manifests                                                                     |
+| `src/connector.ts`                                 | The generic connector: runs a manifest's capabilities over HTTP                                   |
+| `src/execution-service.ts`                         | The service's route: verifies a signed release or a signed authorization, then runs the connector |
+| `src/external-release.ts`                          | Verifies Parmana's signed releases: signature, audience, expiry and replay                        |
+| `src/postgres-nonce-store.ts`                      | Shared replay store backed by PostgreSQL                                                          |
+| `src/mcp-tools.ts`, `src/mcp-server.ts`            | MCP tools built from the manifest's capabilities                                                  |
+| `src/parmana-client.ts`                            | HTTP client for Parmana's API                                                                     |
+| `src/config.ts`, `src/mcp-config.ts`               | Environment configuration, which refuses invalid values                                           |
+| `src/main.ts`, `src/mcp-main.ts`, `src/migrate.ts` | Entry points                                                                                      |
+| `scripts/signed-request.mjs`                       | Sends one signed request to a running service, for a quick check                                  |
+| `tests/`                                           | Unit and integration tests                                                                        |
 
 ## Status
 
-Development. The execution service and the MCP server are built and tested, but neither has been run against a production Parmana deployment. The public sandbox has been used for a live check, and the approved path there is currently blocked by a missing table on the sandbox side. See the end-to-end guide for details.
+As of 2026-10-29:
+
+- **Verified.** A signed release from Parmana's local API, under the `httpbin-read` policy, was released to a service on Render. The service verified it and ran the call, and the result was recorded as verified. A signed authorization sent directly to the service was accepted.
+- **Verified by tests.** The release checks (signature, audience, expiry, replay), the manifest rules, the configuration rules, and the MCP tools.
+- **Not yet done.** The service has not been run against a production Parmana deployment. Its real public key has not been installed. Replay protection on a single instance uses memory unless `PARMANA_NONCE_STORE=postgres` is set.
+- **Hosting.** The free Render plan sleeps when idle, and the first request after a sleep can take about 50 seconds.
+- **Sandbox.** The public sandbox's approved path could not be completed when it was last tested, because a table is missing on the sandbox side.
+
+## Security
+
+- Never commit `.env`, anything in `keys/`, or any `*.pem` file. The `.gitignore` covers them, but check `git status` before every commit.
+- The upstream credential is read from the service's environment and sent only to the upstream. The service's own error messages name the setting, never its value. An upstream service that echoes request headers can still return the credential, so use a test value for a public test service.
+- A release is authenticated by its signature, not by a shared secret. The service accepts only releases signed by the key it was given, addressed to its own URL, unexpired, and not yet run.
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md). Commits need a `Signed-off-by` line that matches the author, because the project uses the Developer Certificate of Origin.
+
+## License
+
+Apache-2.0, as declared in `package.json`.
