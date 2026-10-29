@@ -11,7 +11,7 @@ interface Seen {
 }
 
 const TOKEN = "pat-test-SECRET-123";
-const credential: CredentialHandle = { providerId: "test", credentialId: "HUBSPOT_PRIVATE_APP_TOKEN", value: TOKEN };
+const credential: CredentialHandle = { providerId: "test", credentialId: "EXAMPLE_TOKEN", value: TOKEN };
 const context = { credential, timeoutMs: 2_000 };
 
 let server: Server;
@@ -77,18 +77,18 @@ beforeEach(() => {
 
 function manifest(overrides: { credential?: unknown; capabilities?: unknown[] } = {}) {
   return {
-    system: "hubspot",
+    system: "example",
     baseUrl,
     apiVersion: "v3",
-    credential: overrides.credential ?? { type: "bearer", secretRef: "HUBSPOT_PRIVATE_APP_TOKEN" },
+    credential: overrides.credential ?? { type: "bearer", secretRef: "EXAMPLE_TOKEN" },
     capabilities: overrides.capabilities ?? [
       {
-        id: "hubspot:deal-fetch",
+        id: "example:item-fetch",
         method: "GET",
-        path: "/crm/v3/objects/deals/{dealId}",
+        path: "/items/{itemId}",
         effect: "read",
         input: {
-          dealId: { type: "string", required: true },
+          itemId: { type: "string", required: true },
           properties: { type: "array" },
         },
       },
@@ -96,13 +96,13 @@ function manifest(overrides: { credential?: unknown; capabilities?: unknown[] } 
   };
 }
 
-const updateDeal = {
-  id: "hubspot:deal-update",
+const updateItem = {
+  id: "example:item-update",
   method: "PATCH",
-  path: "/crm/v3/objects/deals/{dealId}",
+  path: "/items/{itemId}",
   effect: "write",
   input: {
-    dealId: { type: "string", required: true },
+    itemId: { type: "string", required: true },
     properties: { type: "object", required: true },
   },
 };
@@ -136,13 +136,13 @@ describe("construction", () => {
     const connector = createGenericConnector(
       manifest({
         capabilities: [
-          { id: "hubspot:deal-fetch", method: "GET", path: "/deals", effect: "read" },
-          updateDeal,
+          { id: "example:item-fetch", method: "GET", path: "/items", effect: "read" },
+          updateItem,
         ],
       }),
       { allowInsecureBaseUrl: true },
     );
-    expect(connector.capabilities).toEqual(["hubspot:deal-fetch", "hubspot:deal-update"]);
+    expect(connector.capabilities).toEqual(["example:item-fetch", "example:item-update"]);
   });
 });
 
@@ -150,14 +150,14 @@ describe("execute: reads", () => {
   it("sends a GET with the path parameter, query and bearer token, and returns the body", async () => {
     const connector = createGenericConnector(manifest(), { allowInsecureBaseUrl: true });
     const result = await connector.execute(
-      { capability: "hubspot:deal-fetch", parameters: { dealId: "123", properties: ["amount"] } },
+      { capability: "example:item-fetch", parameters: { itemId: "123", properties: ["amount"] } },
       context,
     );
 
     expect(result.success).toBe(true);
     expect(result.metadata.status).toBe(200);
     expect(result.metadata.body).toEqual({
-      path: "/crm/v3/objects/deals/123",
+      path: "/items/123",
       query: { properties: '["amount"]' },
     });
     expect(seen).toHaveLength(1);
@@ -168,33 +168,33 @@ describe("execute: reads", () => {
 
   it("sends a header credential under the declared header name", async () => {
     const connector = createGenericConnector(
-      manifest({ credential: { type: "header", headerName: "X-Api-Key", secretRef: "HUBSPOT_PRIVATE_APP_TOKEN" } }),
+      manifest({ credential: { type: "header", headerName: "X-Api-Key", secretRef: "EXAMPLE_TOKEN" } }),
       { allowInsecureBaseUrl: true },
     );
-    await connector.execute({ capability: "hubspot:deal-fetch", parameters: { dealId: "1" } }, context);
+    await connector.execute({ capability: "example:item-fetch", parameters: { itemId: "1" } }, context);
     expect(seen[0]?.headers["x-api-key"]).toBe(TOKEN);
     expect(seen[0]?.headers.authorization).toBeUndefined();
   });
 
   it("URL-encodes a path parameter so it cannot change the path", async () => {
     const connector = createGenericConnector(manifest(), { allowInsecureBaseUrl: true });
-    await connector.execute({ capability: "hubspot:deal-fetch", parameters: { dealId: "a/../b c" } }, context);
-    expect(seen[0]?.url).toBe("/crm/v3/objects/deals/a%2F..%2Fb%20c");
+    await connector.execute({ capability: "example:item-fetch", parameters: { itemId: "a/../b c" } }, context);
+    expect(seen[0]?.url).toBe("/items/a%2F..%2Fb%20c");
   });
 });
 
 describe("execute: writes", () => {
   it("sends a PATCH with the path parameter in the URL and the other inputs as a JSON body", async () => {
-    const connector = createGenericConnector(writeManifest(updateDeal), { allowInsecureBaseUrl: true });
+    const connector = createGenericConnector(writeManifest(updateItem), { allowInsecureBaseUrl: true });
     const result = await connector.execute(
-      { capability: "hubspot:deal-update", parameters: { dealId: "123", properties: { amount: "5000" } } },
+      { capability: "example:item-update", parameters: { itemId: "123", properties: { amount: "5000" } } },
       context,
     );
 
     expect(result.metadata.status).toBe(200);
     expect(seen).toHaveLength(1);
     expect(seen[0]?.method).toBe("PATCH");
-    expect(seen[0]?.url).toBe("/crm/v3/objects/deals/123");
+    expect(seen[0]?.url).toBe("/items/123");
     expect(seen[0]?.headers["content-type"]).toBe("application/json");
     expect(seen[0]?.headers.authorization).toBe(`Bearer ${TOKEN}`);
     // The path parameter stays in the URL and is not repeated in the body.
@@ -204,17 +204,17 @@ describe("execute: writes", () => {
   it("sends a DELETE's inputs in the query string, with no body", async () => {
     const connector = createGenericConnector(
       writeManifest({
-        id: "hubspot:deal-delete",
+        id: "example:item-delete",
         method: "DELETE",
-        path: "/crm/v3/objects/deals/{dealId}",
+        path: "/items/{itemId}",
         effect: "write",
-        input: { dealId: { type: "string", required: true }, archived: { type: "boolean" } },
+        input: { itemId: { type: "string", required: true }, archived: { type: "boolean" } },
       }),
       { allowInsecureBaseUrl: true },
     );
-    await connector.execute({ capability: "hubspot:deal-delete", parameters: { dealId: "9", archived: true } }, context);
+    await connector.execute({ capability: "example:item-delete", parameters: { itemId: "9", archived: true } }, context);
     expect(seen[0]?.method).toBe("DELETE");
-    expect(seen[0]?.url).toBe("/crm/v3/objects/deals/9?archived=true");
+    expect(seen[0]?.url).toBe("/items/9?archived=true");
     expect(seen[0]?.body).toBe("");
     expect(seen[0]?.headers["content-type"]).toBeUndefined();
   });
@@ -222,24 +222,24 @@ describe("execute: writes", () => {
   it("sends an empty JSON object when a write has only path inputs", async () => {
     const connector = createGenericConnector(
       writeManifest({
-        id: "hubspot:deal-archive",
+        id: "example:item-archive",
         method: "POST",
-        path: "/crm/v3/objects/deals/{dealId}/archive",
+        path: "/items/{itemId}/archive",
         effect: "write",
-        input: { dealId: { type: "string", required: true } },
+        input: { itemId: { type: "string", required: true } },
       }),
       { allowInsecureBaseUrl: true },
     );
-    await connector.execute({ capability: "hubspot:deal-archive", parameters: { dealId: "9" } }, context);
+    await connector.execute({ capability: "example:item-archive", parameters: { itemId: "9" } }, context);
     expect(seen[0]?.method).toBe("POST");
-    expect(seen[0]?.url).toBe("/crm/v3/objects/deals/9/archive");
+    expect(seen[0]?.url).toBe("/items/9/archive");
     expect(seen[0]?.body).toBe("{}");
   });
 
   it("refuses a write with a missing required input before any network call", async () => {
-    const connector = createGenericConnector(writeManifest(updateDeal), { allowInsecureBaseUrl: true });
+    const connector = createGenericConnector(writeManifest(updateItem), { allowInsecureBaseUrl: true });
     await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-update", parameters: { dealId: "123" } }, context),
+      connector.execute({ capability: "example:item-update", parameters: { itemId: "123" } }, context),
       "invalid_input",
       'input "properties" is required',
     );
@@ -247,9 +247,9 @@ describe("execute: writes", () => {
   });
 
   it("refuses a write whose body input has the wrong type, before any network call", async () => {
-    const connector = createGenericConnector(writeManifest(updateDeal), { allowInsecureBaseUrl: true });
+    const connector = createGenericConnector(writeManifest(updateItem), { allowInsecureBaseUrl: true });
     await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-update", parameters: { dealId: "123", properties: "amount=5000" } }, context),
+      connector.execute({ capability: "example:item-update", parameters: { itemId: "123", properties: "amount=5000" } }, context),
       "invalid_input",
       'input "properties" must be object',
     );
@@ -257,10 +257,10 @@ describe("execute: writes", () => {
   });
 
   it("refuses a write with an undeclared field, so it cannot smuggle extra data into the body", async () => {
-    const connector = createGenericConnector(writeManifest(updateDeal), { allowInsecureBaseUrl: true });
+    const connector = createGenericConnector(writeManifest(updateItem), { allowInsecureBaseUrl: true });
     await expectConnectorError(
       connector.execute(
-        { capability: "hubspot:deal-update", parameters: { dealId: "123", properties: {}, owner: "someone-else" } },
+        { capability: "example:item-update", parameters: { itemId: "123", properties: {}, owner: "someone-else" } },
         context,
       ),
       "invalid_input",
@@ -271,11 +271,11 @@ describe("execute: writes", () => {
 
   it("reports a write the upstream rejects, without echoing its body", async () => {
     const connector = createGenericConnector(
-      writeManifest({ ...updateDeal, path: "/fail/{dealId}" }),
+      writeManifest({ ...updateItem, path: "/fail/{itemId}" }),
       { allowInsecureBaseUrl: true },
     );
     const err = await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-update", parameters: { dealId: "1", properties: {} } }, context),
+      connector.execute({ capability: "example:item-update", parameters: { itemId: "1", properties: {} } }, context),
       "upstream_error",
       "returned status 500",
     );
@@ -285,11 +285,11 @@ describe("execute: writes", () => {
 
   it("refuses to follow a redirect on a write, so the token and the body never reach another host", async () => {
     const connector = createGenericConnector(
-      writeManifest({ ...updateDeal, path: "/redirect/{dealId}" }),
+      writeManifest({ ...updateItem, path: "/redirect/{itemId}" }),
       { allowInsecureBaseUrl: true },
     );
     await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-update", parameters: { dealId: "1", properties: { stage: "won" } } }, context),
+      connector.execute({ capability: "example:item-update", parameters: { itemId: "1", properties: { stage: "won" } } }, context),
       "upstream_error",
       "redirects are refused",
     );
@@ -301,9 +301,9 @@ describe("execute: refused before any network call", () => {
   it("refuses a capability the manifest does not declare", async () => {
     const connector = createGenericConnector(manifest(), { allowInsecureBaseUrl: true });
     await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-delete", parameters: {} }, context),
+      connector.execute({ capability: "example:item-delete", parameters: {} }, context),
       "unknown_capability",
-      "hubspot:deal-delete",
+      "example:item-delete",
     );
     expect(seen).toHaveLength(0);
   });
@@ -311,9 +311,9 @@ describe("execute: refused before any network call", () => {
   it("refuses a request missing a required input", async () => {
     const connector = createGenericConnector(manifest(), { allowInsecureBaseUrl: true });
     await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-fetch", parameters: {} }, context),
+      connector.execute({ capability: "example:item-fetch", parameters: {} }, context),
       "invalid_input",
-      'input "dealId" is required',
+      'input "itemId" is required',
     );
     expect(seen).toHaveLength(0);
   });
@@ -321,9 +321,9 @@ describe("execute: refused before any network call", () => {
   it("refuses an input of the wrong type", async () => {
     const connector = createGenericConnector(manifest(), { allowInsecureBaseUrl: true });
     await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-fetch", parameters: { dealId: 42 } }, context),
+      connector.execute({ capability: "example:item-fetch", parameters: { itemId: 42 } }, context),
       "invalid_input",
-      'input "dealId" must be string',
+      'input "itemId" must be string',
     );
     expect(seen).toHaveLength(0);
   });
@@ -331,7 +331,7 @@ describe("execute: refused before any network call", () => {
   it("refuses an input the manifest does not declare", async () => {
     const connector = createGenericConnector(manifest(), { allowInsecureBaseUrl: true });
     await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-fetch", parameters: { dealId: "1", admin: true } }, context),
+      connector.execute({ capability: "example:item-fetch", parameters: { itemId: "1", admin: true } }, context),
       "invalid_input",
       'input "admin" is not declared',
     );
@@ -342,9 +342,9 @@ describe("execute: refused before any network call", () => {
     const connector = createGenericConnector(manifest(), { allowInsecureBaseUrl: true });
     const empty = { ...context, credential: { ...credential, value: "" } };
     await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-fetch", parameters: { dealId: "1" } }, empty),
+      connector.execute({ capability: "example:item-fetch", parameters: { itemId: "1" } }, empty),
       "credential_invalid",
-      "HUBSPOT_PRIVATE_APP_TOKEN",
+      "EXAMPLE_TOKEN",
     );
     expect(seen).toHaveLength(0);
   });
@@ -354,12 +354,12 @@ describe("execute: upstream failures", () => {
   it("reports a non-2xx status without echoing the upstream body", async () => {
     const connector = createGenericConnector(
       manifest({
-        capabilities: [{ id: "hubspot:deal-fetch", method: "GET", path: "/missing/{dealId}", effect: "read", input: { dealId: { type: "string", required: true } } }],
+        capabilities: [{ id: "example:item-fetch", method: "GET", path: "/missing/{itemId}", effect: "read", input: { itemId: { type: "string", required: true } } }],
       }),
       { allowInsecureBaseUrl: true },
     );
     const err = await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-fetch", parameters: { dealId: "1" } }, context),
+      connector.execute({ capability: "example:item-fetch", parameters: { itemId: "1" } }, context),
       "upstream_error",
       "returned status 404",
     );
@@ -369,12 +369,12 @@ describe("execute: upstream failures", () => {
   it("refuses to follow a redirect, so the token never reaches another host", async () => {
     const connector = createGenericConnector(
       manifest({
-        capabilities: [{ id: "hubspot:deal-fetch", method: "GET", path: "/redirect/{dealId}", effect: "read", input: { dealId: { type: "string", required: true } } }],
+        capabilities: [{ id: "example:item-fetch", method: "GET", path: "/redirect/{itemId}", effect: "read", input: { itemId: { type: "string", required: true } } }],
       }),
       { allowInsecureBaseUrl: true },
     );
     await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-fetch", parameters: { dealId: "1" } }, context),
+      connector.execute({ capability: "example:item-fetch", parameters: { itemId: "1" } }, context),
       "upstream_error",
       "redirects are refused",
     );
@@ -384,7 +384,7 @@ describe("execute: upstream failures", () => {
   it("refuses a response larger than the limit", async () => {
     const big = createGenericConnector(manifest(), { allowInsecureBaseUrl: true, maxResponseBytes: 10 });
     await expectConnectorError(
-      big.execute({ capability: "hubspot:deal-fetch", parameters: { dealId: "1" } }, context),
+      big.execute({ capability: "example:item-fetch", parameters: { itemId: "1" } }, context),
       "upstream_error",
       "response larger than 10 bytes",
     );
@@ -394,7 +394,7 @@ describe("execute: upstream failures", () => {
     slow = true;
     const connector = createGenericConnector(manifest(), { allowInsecureBaseUrl: true });
     await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-fetch", parameters: { dealId: "1" } }, { ...context, timeoutMs: 100 }),
+      connector.execute({ capability: "example:item-fetch", parameters: { itemId: "1" } }, { ...context, timeoutMs: 100 }),
       "timeout",
       "no response within 100 ms",
     );
@@ -409,7 +409,7 @@ describe("execute: upstream failures", () => {
     });
     const connector = createGenericConnector({ ...manifest(), baseUrl: `http://127.0.0.1:${closedPort}` }, { allowInsecureBaseUrl: true });
     await expectConnectorError(
-      connector.execute({ capability: "hubspot:deal-fetch", parameters: { dealId: "1" } }, context),
+      connector.execute({ capability: "example:item-fetch", parameters: { itemId: "1" } }, context),
       "upstream_error",
       "request failed",
     );

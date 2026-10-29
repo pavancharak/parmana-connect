@@ -22,8 +22,8 @@ process.env.PARMANA_POLICY_DIR ??= mkdtempSync(join(tmpdir(), "parmana-policies-
 
 const BEARER = "service-bearer-e2e";
 const SECRET = "upstream-secret-E2E";
-const ACTION = "hubspot:deal-fetch";
-const TARGET = "crm/deals/123";
+const ACTION = "example:item-fetch";
+const TARGET = "items/123";
 const TRANSACTION = "txn-e2e-1";
 
 const crypto = CryptoBootstrap.create();
@@ -46,17 +46,17 @@ beforeAll(async () => {
 
   const connector = createGenericConnector(
     {
-      system: "hubspot",
+      system: "example",
       baseUrl: upstreamUrl,
       apiVersion: "v3",
-      credential: { type: "bearer", secretRef: "HUBSPOT_TOKEN" },
+      credential: { type: "bearer", secretRef: "EXAMPLE_TOKEN" },
       capabilities: [
         {
           id: ACTION,
           method: "GET",
-          path: "/deals/{dealId}",
+          path: "/items/{itemId}",
           effect: "read",
-          input: { dealId: { type: "string", required: true } },
+          input: { itemId: { type: "string", required: true } },
         },
       ],
     },
@@ -68,7 +68,7 @@ beforeAll(async () => {
     publicKey,
     connector,
     resolveCredential: () => SECRET,
-    credentialId: "HUBSPOT_TOKEN",
+    credentialId: "EXAMPLE_TOKEN",
     nonceStore: new MemoryNonceStore(),
   });
   service = await handler.listen(0);
@@ -126,7 +126,7 @@ const executionSystem = () =>
 
 describe("parmana-core HttpExecutionSystem -> execution service", () => {
   it("runs an approved action and returns parmana-core's expected result", async () => {
-    const request = await approvedRequest({ dealId: "123" });
+    const request = await approvedRequest({ itemId: "123" });
     const result = await executionSystem().execute(request);
 
     expect(result.success).toBe(true);
@@ -135,15 +135,15 @@ describe("parmana-core HttpExecutionSystem -> execution service", () => {
   });
 
   it("refuses an action whose parameters were changed after approval", async () => {
-    const request = await approvedRequest({ dealId: "123" });
-    const tampered = { ...request, parameters: { dealId: "999" } };
+    const request = await approvedRequest({ itemId: "123" });
+    const tampered = { ...request, parameters: { itemId: "999" } };
 
     await expect(executionSystem().execute(tampered)).rejects.toThrow("Execution System returned HTTP 403.");
     expect(upstreamCalls).toBe(0);
   });
 
   it("refuses the same approved action a second time", async () => {
-    const request = await approvedRequest({ dealId: "123" });
+    const request = await approvedRequest({ itemId: "123" });
 
     await executionSystem().execute(request);
     await expect(executionSystem().execute(request)).rejects.toThrow("Execution System returned HTTP 403.");
@@ -151,7 +151,7 @@ describe("parmana-core HttpExecutionSystem -> execution service", () => {
   });
 
   it("refuses a request with the wrong bearer token", async () => {
-    const request = await approvedRequest({ dealId: "123" });
+    const request = await approvedRequest({ itemId: "123" });
     const wrong = new HttpExecutionSystem({
       baseUrl: serviceUrl,
       headers: { Authorization: "Bearer not-the-token" },

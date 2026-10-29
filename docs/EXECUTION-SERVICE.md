@@ -11,9 +11,9 @@ It is a library, `createExecutionService` in `src/execution-service.ts`. It has 
 ```json
 {
   "businessTransactionId": "...",
-  "action": "hubspot:deal-fetch",
-  "target": "crm/deals/123",
-  "parameters": { "dealId": "123" },
+  "action": "example:item-fetch",
+  "target": "items/123",
+  "parameters": { "itemId": "123" },
   "authorization": { "payload": { ... }, "signature": "...", "keyId": "...", "algorithm": "..." }
 }
 ```

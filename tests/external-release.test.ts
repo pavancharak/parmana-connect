@@ -79,7 +79,7 @@ describe("verifyExternalRelease", () => {
     const body = signed(release());
     const tampered = {
       ...body,
-      release: { ...body.release, parameters: { dealId: "999" } },
+      release: { ...body.release, parameters: { itemId: "999" } },
     };
 
     const check = await verifyExternalRelease(tampered, options());

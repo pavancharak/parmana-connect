@@ -8,9 +8,9 @@ const complete = {
   PARMANA_API_KEY: "key-value",
   PARMANA_AUTHORITY_ID: "authority-1",
   PARMANA_AUTHORITY_TYPE: "SERVICE",
-  PARMANA_PRINCIPAL_ID: "hubspot-agent",
+  PARMANA_PRINCIPAL_ID: "example-agent",
   PARMANA_AUTHORIZATION_ID: "authorization-1",
-  PARMANA_AUTHORIZATION_PURPOSE: "Read deals",
+  PARMANA_AUTHORIZATION_PURPOSE: "Read items",
   PARMANA_CONNECTOR_MANIFEST: "/manifest.json",
 };
 
@@ -29,7 +29,7 @@ describe("loadMcpConfig", () => {
     const config = loadMcpConfig(complete);
 
     expect(config.sourceSystem).toBe("parmana-connect");
-    expect(config.submittedBy).toBe("hubspot-agent");
+    expect(config.submittedBy).toBe("example-agent");
   });
 
   it("refuses a Parmana URL that is not https, because the key would travel in clear text", () => {

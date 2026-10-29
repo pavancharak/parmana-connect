@@ -39,23 +39,23 @@ Today, adding a connector means editing `parmana-core` source and sending a pull
 A manifest describes one system and the capabilities it exposes. Example shape (illustrative, not final):
 
 ```yaml
-system: hubspot
+system: example
 baseUrl: https://api.hubapi.com
 credential:
   type: bearer
-  secretRef: HUBSPOT_PRIVATE_APP_TOKEN
+  secretRef: EXAMPLE_TOKEN
 capabilities:
-  - id: hubspot:deal-fetch
+  - id: example:item-fetch
     method: GET
-    path: /crm/v3/objects/deals/{dealId}
+    path: /items/{itemId}
     input:
-      dealId: { type: string, required: true }
+      itemId: { type: string, required: true }
     effect: read
-  - id: hubspot:deal-update
+  - id: example:item-update
     method: PATCH
-    path: /crm/v3/objects/deals/{dealId}
+    path: /items/{itemId}
     input:
-      dealId: { type: string, required: true }
+      itemId: { type: string, required: true }
       properties: { type: object, required: true }
     effect: write
 ```
@@ -118,7 +118,7 @@ These are decisions to make before the code is written:
 1. **Manifest format:** YAML, JSON, or both? Recommendation: YAML for authors, JSON Schema for validation.
 2. **Pagination, retries and rate limits:** in the manifest, or left to each connector? Recommendation: start without them and add them when a real system needs them.
 3. **Where manifests live:** in this repo, in the user's own repo, or both? Recommendation: both are supported, with examples here.
-4. **Which connector first:** HubSpot deal update is the simplest write path that already has a live integration in `parmana-core`, so it can be checked against known behaviour.
+4. **Which connector first:** The item update is the simplest write path that already has a live integration in `parmana-core`, so it can be checked against known behaviour.
 5. **Versioning:** does a manifest pin the target API version? Recommendation: yes, with a required `apiVersion` field.
 
 ## Build order

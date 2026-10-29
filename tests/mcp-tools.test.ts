@@ -6,18 +6,18 @@ import { callTool, toolsFor, type ToolContext } from "../src/mcp-tools.js";
 
 const KEY = "parmana-key-SECRET-789";
 const MANIFEST_TEXT = JSON.stringify({
-  system: "hubspot",
+  system: "example",
   baseUrl: "https://api.hubapi.com",
   apiVersion: "v3",
-  credential: { type: "bearer", secretRef: "HUBSPOT_TOKEN" },
+  credential: { type: "bearer", secretRef: "EXAMPLE_TOKEN" },
   capabilities: [
     {
-      id: "hubspot:deal-update",
+      id: "example:item-update",
       method: "PATCH",
-      path: "/crm/v3/objects/deals/{dealId}",
+      path: "/items/{itemId}",
       effect: "write",
       input: {
-        dealId: { type: "string", required: true },
+        itemId: { type: "string", required: true },
         properties: { type: "object", required: true },
       },
     },
@@ -30,7 +30,7 @@ const manifest = (() => {
   return result.manifest;
 })();
 
-const POLICY = { capability: "hubspot:deal-update", policy: { name: "deal-policy", version: "2.0.0", schemaVersion: "1.0.0" }, description: null };
+const POLICY = { capability: "example:item-update", policy: { name: "item-policy", version: "2.0.0", schemaVersion: "1.0.0" }, description: null };
 
 interface Call {
   method: string;
@@ -59,32 +59,32 @@ function context(parmana: ParmanaClient): ToolContext {
   const ids = ["btx-1", "corr-1", "intent-1"];
   return {
     parmana,
-    authority: { authorityId: "authority-1", authorityType: "SERVICE", principalId: "hubspot-agent" },
+    authority: { authorityId: "authority-1", authorityType: "SERVICE", principalId: "example-agent" },
     authorizationId: "authorization-1",
-    purpose: "Update deal stage",
+    purpose: "Update item stage",
     sourceSystem: "parmana-connect",
-    submittedBy: "hubspot-agent",
+    submittedBy: "example-agent",
     now: () => new Date("2026-10-28T10:00:00.000Z"),
     newId: () => ids.shift() ?? "id-extra",
   };
 }
 
-const ARGS = { target: "crm/deals/123", dealId: "123", properties: { dealstage: "won" } };
+const ARGS = { target: "items/123", itemId: "123", properties: { stage: "won" } };
 
 describe("toolsFor", () => {
   it("creates one tool per capability with the capability's own input schema", () => {
     const [tool] = toolsFor(manifest);
 
-    expect(tool?.name).toBe("hubspot:deal-update");
+    expect(tool?.name).toBe("example:item-update");
     expect(tool?.inputSchema).toEqual({
       type: "object",
       properties: {
         target: { type: "string", minLength: 1, description: expect.any(String) },
-        dealId: { type: "string" },
+        itemId: { type: "string" },
         properties: { type: "object" },
         signals: { type: "object", description: expect.any(String) },
       },
-      required: ["target", "dealId", "properties"],
+      required: ["target", "itemId", "properties"],
       additionalProperties: false,
     });
   });
@@ -93,27 +93,27 @@ describe("toolsFor", () => {
 describe("callTool: a successful call", () => {
   it("reads the policy in effect, then sends one transaction built from the configuration", async () => {
     const { calls, parmana } = stubParmana({ status: 200, body: { status: "RELEASED" } });
-    const result = await callTool(manifest, context(parmana), "hubspot:deal-update", ARGS);
+    const result = await callTool(manifest, context(parmana), "example:item-update", ARGS);
 
     expect(result.isError).toBe(false);
     expect(calls.map((c) => c.method + " " + new URL(c.url).pathname)).toEqual(["GET /policies/in-effect", "POST /execute"]);
     const sent = calls[1]?.body as Record<string, any>;
     expect(sent.businessTransactionId).toBe("btx-1");
-    expect(sent.policy).toEqual({ name: "deal-policy", version: "2.0.0", schemaVersion: "1.0.0" });
-    expect(sent.authority).toEqual({ authorityId: "authority-1", authorityType: "SERVICE", principalId: "hubspot-agent", issuedAt: "2026-10-28T10:00:00.000Z" });
+    expect(sent.policy).toEqual({ name: "item-policy", version: "2.0.0", schemaVersion: "1.0.0" });
+    expect(sent.authority).toEqual({ authorityId: "authority-1", authorityType: "SERVICE", principalId: "example-agent", issuedAt: "2026-10-28T10:00:00.000Z" });
     expect(sent.intent).toEqual({
       intentId: "intent-1",
       authorizationId: "authorization-1",
-      action: "hubspot:deal-update",
-      target: "crm/deals/123",
-      parameters: { dealId: "123", properties: { dealstage: "won" } },
+      action: "example:item-update",
+      target: "items/123",
+      parameters: { itemId: "123", properties: { stage: "won" } },
       createdAt: "2026-10-28T10:00:00.000Z",
     });
   });
 
   it("sends the key as a bearer token and never returns it", async () => {
     const { calls, parmana } = stubParmana({ status: 200, body: { status: "RELEASED" } });
-    const result = await callTool(manifest, context(parmana), "hubspot:deal-update", ARGS);
+    const result = await callTool(manifest, context(parmana), "example:item-update", ARGS);
 
     expect(calls[1]?.authorization).toBe(`Bearer ${KEY}`);
     expect(JSON.stringify(result)).not.toContain(KEY);
@@ -123,7 +123,7 @@ describe("callTool: a successful call", () => {
 describe("callTool: refusals before anything is sent", () => {
   it("refuses an unknown tool", async () => {
     const { calls, parmana } = stubParmana({ status: 200, body: {} });
-    const result = await callTool(manifest, context(parmana), "hubspot:deal-delete", ARGS);
+    const result = await callTool(manifest, context(parmana), "example:item-delete", ARGS);
 
     expect(result.isError).toBe(true);
     expect(calls).toHaveLength(0);
@@ -131,7 +131,7 @@ describe("callTool: refusals before anything is sent", () => {
 
   it("refuses a missing target", async () => {
     const { calls, parmana } = stubParmana({ status: 200, body: {} });
-    const result = await callTool(manifest, context(parmana), "hubspot:deal-update", { dealId: "1", properties: {} });
+    const result = await callTool(manifest, context(parmana), "example:item-update", { itemId: "1", properties: {} });
 
     expect(result.content[0]?.text).toContain("target is required");
     expect(calls).toHaveLength(0);
@@ -139,7 +139,7 @@ describe("callTool: refusals before anything is sent", () => {
 
   it("refuses an argument the capability does not declare", async () => {
     const { calls, parmana } = stubParmana({ status: 200, body: {} });
-    const result = await callTool(manifest, context(parmana), "hubspot:deal-update", { ...ARGS, owner: "someone" });
+    const result = await callTool(manifest, context(parmana), "example:item-update", { ...ARGS, owner: "someone" });
 
     expect(result.content[0]?.text).toContain('"owner" is not an input');
     expect(calls).toHaveLength(0);
@@ -147,7 +147,7 @@ describe("callTool: refusals before anything is sent", () => {
 
   it("refuses a missing required input", async () => {
     const { calls, parmana } = stubParmana({ status: 200, body: {} });
-    const result = await callTool(manifest, context(parmana), "hubspot:deal-update", { target: "crm/deals/1", dealId: "1" });
+    const result = await callTool(manifest, context(parmana), "example:item-update", { target: "items/1", itemId: "1" });
 
     expect(result.content[0]?.text).toContain('"properties" is required');
     expect(calls).toHaveLength(0);
@@ -157,7 +157,7 @@ describe("callTool: refusals before anything is sent", () => {
 describe("callTool: outcomes", () => {
   const run = async (status: number, body: unknown) => {
     const { calls, parmana } = stubParmana({ status, body });
-    const result = await callTool(manifest, context(parmana), "hubspot:deal-update", ARGS);
+    const result = await callTool(manifest, context(parmana), "example:item-update", ARGS);
     return { result, executes: calls.filter((c) => c.method === "POST").length };
   };
 
@@ -205,7 +205,7 @@ describe("callTool: Parmana unreachable", () => {
     }) as unknown as typeof fetch;
     const parmana = new ParmanaClient({ baseUrl: "https://parmana.example", apiKey: KEY, fetch: failing });
 
-    await expect(callTool(manifest, context(parmana), "hubspot:deal-update", ARGS)).rejects.toBeInstanceOf(ParmanaUnavailableError);
+    await expect(callTool(manifest, context(parmana), "example:item-update", ARGS)).rejects.toBeInstanceOf(ParmanaUnavailableError);
   });
 });
 
@@ -213,23 +213,23 @@ describe("callTool: signals", () => {
   it("sends the signals the caller supplies, unchanged, and not as parameters", async () => {
     const { calls, parmana } = stubParmana({ status: 200, body: {} });
     const signals = { note: "hello", receiptApproved: true, approvalArtifact: { signature: "abc" } };
-    await callTool(manifest, context(parmana), "hubspot:deal-update", { ...ARGS, signals });
+    await callTool(manifest, context(parmana), "example:item-update", { ...ARGS, signals });
 
     const sent = calls[1]?.body as Record<string, any>;
     expect(sent.signals).toEqual(signals);
-    expect(sent.intent.parameters).toEqual({ dealId: "123", properties: { dealstage: "won" } });
+    expect(sent.intent.parameters).toEqual({ itemId: "123", properties: { stage: "won" } });
   });
 
   it("sends empty signals when none are supplied", async () => {
     const { calls, parmana } = stubParmana({ status: 200, body: {} });
-    await callTool(manifest, context(parmana), "hubspot:deal-update", ARGS);
+    await callTool(manifest, context(parmana), "example:item-update", ARGS);
 
     expect((calls[1]?.body as Record<string, any>).signals).toEqual({});
   });
 
   it("refuses signals that are not an object, before anything is sent", async () => {
     const { calls, parmana } = stubParmana({ status: 200, body: {} });
-    const result = await callTool(manifest, context(parmana), "hubspot:deal-update", { ...ARGS, signals: "approved" });
+    const result = await callTool(manifest, context(parmana), "example:item-update", { ...ARGS, signals: "approved" });
 
     expect(result.content[0]?.text).toBe("signals must be an object.");
     expect(calls).toHaveLength(0);
