@@ -81,6 +81,11 @@ Start the MCP server with `npm run mcp`.
 
 [`docs/SETUP.md`](docs/SETUP.md) gives the full steps for a Windows computer and for Render's free tier, including the environment variables and the secret files. Set `PARMANA_SERVICE_HOST=0.0.0.0` on a hosted service, and register the exact `/execute` URL in Parmana as the endpoint.
 
+## Reference
+
+- The `POST /execute` contract, with every check, answer, status code and limit: [docs/API.md](docs/API.md).
+- The manifest format, its validation rules and what the generic connector does with each capability: [docs/MANIFEST.md](docs/MANIFEST.md).
+
 ## Documentation
 
 | Document                                                                                      | For                                                                                   |
@@ -124,6 +129,8 @@ As of 2026-10-29:
 
 ## Security
 
+To report a vulnerability, follow [SECURITY.md](SECURITY.md). Do not open a public issue for it.
+
 - Never commit `.env`, anything in `keys/`, or any `*.pem` file. The `.gitignore` covers them, but check `git status` before every commit.
 - The upstream credential is read from the service's environment and sent only to the upstream. The service's own error messages name the setting, never its value. An upstream service that echoes request headers can still return the credential, so use a test value for a public test service.
 - A release is authenticated by its signature, not by a shared secret. The service accepts only releases signed by the key it was given, addressed to its own URL, unexpired, and not yet run.
@@ -134,4 +141,4 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md). Commits need a `Signed-off-by` line tha
 
 ## License
 
-Apache-2.0, as declared in `package.json`.
+Apache-2.0, as declared in `package.json`. The licence text is in [LICENSE](LICENSE).

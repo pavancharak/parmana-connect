@@ -218,7 +218,7 @@ On 2026-10-28 step 2 reached the release, but the sandbox could not record the o
 - **The execution service has no health route** and no configuration for its own TLS. Put it behind a TLS-terminating proxy.
 - **Replay protection** depends on the nonce store. With `memory`, it does not hold across processes.
 - **The MCP server has not run against a production deployment.** Its live check used the sandbox, and the approved path is blocked on the sandbox side.
-- **The Python connector SDK and a Python receiving service** are not part of this repository. See [EXECUTION-SERVICE.md](EXECUTION-SERVICE.md#why-there-is-no-python-version).
+- **The Python connector SDK and a Python receiving service** are not part of this repository. See [EXECUTION-SERVICE.md](EXECUTION-SERVICE.md#publishing-status-of-the-core-packages).
 
 ## 10. Troubleshooting
 
