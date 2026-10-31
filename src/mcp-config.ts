@@ -13,7 +13,16 @@ export interface McpConfig {
   readonly manifestPath: string;
 }
 
+/** The HTTP entry point's settings: the stdio settings, plus the endpoint's own. */
+export interface McpHttpConfig extends McpConfig {
+  /** Shared secret an MCP client presents as a bearer token. Never logged. */
+  readonly bearerToken: string;
+  readonly host: string;
+  readonly port: number;
+}
+
 const AUTHORITY_TYPES = ["USER", "ROLE", "SERVICE", "ORGANIZATION"] as const;
+const MIN_TOKEN_LENGTH = 32;
 
 /**
  * Reads the MCP server's settings from the environment. It refuses an
@@ -49,6 +58,28 @@ export function loadMcpConfig(env: Readonly<Record<string, string | undefined>>)
     submittedBy: env.PARMANA_SUBMITTED_BY ?? principalId,
     manifestPath: required(env, "PARMANA_CONNECTOR_MANIFEST"),
   };
+}
+
+/**
+ * Reads the HTTP entry point's settings. The endpoint itself listens on plain
+ * HTTP, so it must sit behind an HTTPS terminator; it refuses to start without
+ * a bearer token of at least 32 characters.
+ */
+export function loadMcpHttpConfig(env: Readonly<Record<string, string | undefined>>): McpHttpConfig {
+  const base = loadMcpConfig(env);
+
+  const bearerToken = required(env, "PARMANA_MCP_BEARER_TOKEN");
+  if (bearerToken.length < MIN_TOKEN_LENGTH) {
+    throw new ConfigError(`PARMANA_MCP_BEARER_TOKEN must be at least ${MIN_TOKEN_LENGTH} characters`);
+  }
+
+  const portText = env.PARMANA_MCP_PORT ?? "8081";
+  const port = Number(portText);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new ConfigError("PARMANA_MCP_PORT must be an integer from 1 to 65535");
+  }
+
+  return { ...base, bearerToken, host: env.PARMANA_MCP_HOST ?? "127.0.0.1", port };
 }
 
 function required(env: Readonly<Record<string, string | undefined>>, name: string): string {
