@@ -13,7 +13,8 @@
     "test": "vitest run",
     "start": "node dist/main.js",
     "migrate": "node dist/migrate.js",
-    "mcp": "node dist/mcp-main.js"
+    "mcp": "node dist/mcp-main.js",
+    "doctor": "node dist/doctor-main.js"
   },
   "license": "Apache-2.0",
   "dependencies": {
