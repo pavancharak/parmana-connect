@@ -52,6 +52,8 @@ node --env-file=.env dist/main.js
 | The manifest's `secretRef`     | Yes             | none        | The environment variable holding the upstream credential.                                                      |
 | `PARMANA_POLICY_DIR`           | Yes             | none        | An existing folder. Required by the crypto setup.                                                              |
 | `PARMANA_RELEASE_AUDIENCE`     | For releases    | unset       | The endpoint URL as registered in Parmana, for example `https://service.example.com/execute`. Must be `https`. |
+| `PARMANA_EXPECTED_KEY_FINGERPRINT` | No          | unset       | Pins the key. The service refuses to start unless the key in `PARMANA_PUBLIC_KEY_FILE` has this `sha256:` fingerprint. Use the value you confirmed through a second channel. |
+| `PARMANA_EXPECTED_AUDIENCE`    | No              | unset       | Pins the audience. The service refuses to start unless `PARMANA_RELEASE_AUDIENCE` equals this value exactly. |
 | `PARMANA_NONCE_STORE`          | No              | `postgres`  | `postgres` shares replay records across instances. `memory` is for one instance only.                          |
 | `PARMANA_DATABASE_URL`         | With `postgres` | none        | Connection string for the replay store.                                                                        |
 | `PARMANA_SERVICE_PORT`         | No              | `8080`      | Port to listen on.                                                                                             |
@@ -76,6 +78,12 @@ The service refuses to start when a required setting is missing, and the error n
 | `PARMANA_SUBMITTED_BY`          | No       | Defaults to the principal.                              |
 
 Start the MCP server with `npm run mcp`.
+
+### Check the configuration
+
+Run `npm run doctor` before starting the service. It runs every configuration check and lists all the problems at once, each with a fix. It never prints a secret value.
+
+Set `PARMANA_EXPECTED_KEY_FINGERPRINT` and `PARMANA_EXPECTED_AUDIENCE` to pin the key and the audience. With those set, the service refuses to start when either differs from the pinned value. Without them, `doctor` warns that the values were not compared, and the service starts as before.
 
 ## Deploying
 

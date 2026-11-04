@@ -1,5 +1,6 @@
 import { createPublicKey, type KeyObject } from "node:crypto";
 
+import { fingerprintOf } from "./fingerprint.js";
 import { loadManifest, type Manifest } from "./manifest.js";
 
 /**
@@ -65,6 +66,23 @@ export function loadServiceConfig(
   const databaseUrl = nonceStore === "postgres" ? required(env, "PARMANA_DATABASE_URL") : undefined;
 
   const releaseAudience = optionalHttpsUrl(env, "PARMANA_RELEASE_AUDIENCE");
+
+  // Optional pins. When set, startup stops unless the running key and audience match them exactly.
+  const expectedFingerprint = env.PARMANA_EXPECTED_KEY_FINGERPRINT;
+  if (expectedFingerprint !== undefined && expectedFingerprint !== "" && expectedFingerprint !== fingerprintOf(publicKey)) {
+    throw new ConfigError(
+      "PARMANA_EXPECTED_KEY_FINGERPRINT does not match the key in PARMANA_PUBLIC_KEY_FILE. Check the key, or update the pinned value after confirming a rotation",
+    );
+  }
+  const expectedAudience = env.PARMANA_EXPECTED_AUDIENCE;
+  if (expectedAudience !== undefined && expectedAudience !== "") {
+    if (releaseAudience === undefined) {
+      throw new ConfigError("PARMANA_EXPECTED_AUDIENCE is set, but PARMANA_RELEASE_AUDIENCE is not");
+    }
+    if (releaseAudience !== expectedAudience) {
+      throw new ConfigError("PARMANA_RELEASE_AUDIENCE does not match PARMANA_EXPECTED_AUDIENCE");
+    }
+  }
 
   return { port, host, bearerToken, publicKey, manifest, credentialVariable, timeoutMs, nonceStore, databaseUrl, releaseAudience };
 }

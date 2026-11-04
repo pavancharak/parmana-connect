@@ -1,6 +1,9 @@
-import { createHash, createPublicKey, type KeyObject } from "node:crypto";
+import { createPublicKey, type KeyObject } from "node:crypto";
 
+import { fingerprintOf } from "./fingerprint.js";
 import { loadManifest } from "./manifest.js";
+
+export { fingerprintOf };
 
 /**
  * One check from `doctor`. "pass" means the setting is right, "warn" means it
@@ -38,12 +41,6 @@ export function runDoctor(env: Env, readers: DoctorReaders): Check[] {
     checkNumbers(env),
     checkClock(),
   ];
-}
-
-/** SHA-256 of the SPKI DER encoding, in the form the verifier pins: `sha256:<64 hex>`. */
-export function fingerprintOf(key: KeyObject): string {
-  const der = key.export({ type: "spki", format: "der" });
-  return `sha256:${createHash("sha256").update(der).digest("hex")}`;
 }
 
 function checkBearerToken(env: Env): Check {
