@@ -1,7 +1,7 @@
-import { generateKeyPairSync } from "node:crypto";
+import { generateKeyPairSync, randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
-import { fingerprintOf, runDoctor, type Check } from "../src/doctor.js";
+import { closestSetting, fingerprintOf, runDoctor, type Check } from "../src/doctor.js";
 
 const { publicKey: ed25519Public } = generateKeyPairSync("ed25519");
 const ed25519Pem = ed25519Public.export({ type: "spki", format: "pem" }).toString();
@@ -17,7 +17,8 @@ const MANIFEST = JSON.stringify({
   capabilities: [{ id: "example:item-fetch", method: "GET", path: "/items/{itemId}", effect: "read", input: { itemId: { type: "string", required: true } } }],
 });
 
-const TOKEN = "a".repeat(32);
+// Generated at run time, so no token-shaped literal is committed.
+const TOKEN = randomBytes(16).toString("hex");
 const SECRET_VALUE = "upstream-secret-value-do-not-print";
 
 const files: Record<string, string> = {
@@ -34,6 +35,8 @@ const readers = {
     return value;
   },
   directoryExists: (path: string) => path === "/policies",
+  listDirectory: (path: string) => (path === "/policies" ? ["policy.json"] : []),
+  nodeMajor: 24,
 };
 
 function env(overrides: Record<string, string | undefined> = {}): Record<string, string | undefined> {
@@ -163,5 +166,48 @@ describe("doctor", () => {
     const text = JSON.stringify(checks);
     expect(text).not.toContain(SECRET_VALUE);
     expect(text).not.toContain(TOKEN);
+  });
+
+  it("fails when the file at PARMANA_PUBLIC_KEY_FILE holds a private key", () => {
+    const { privateKey } = generateKeyPairSync("ed25519");
+    const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+    const withPrivate = { ...readers, readFile: (path: string) => (path === "/keys/parmana.pem" ? pem : readers.readFile(path)) };
+    const result = check(runDoctor(env(), withPrivate), "PARMANA_PUBLIC_KEY_FILE");
+    expect(result.level).toBe("fail");
+    expect(result.message).toContain("private key");
+    expect(JSON.stringify(result)).not.toContain(pem.split("\n")[1] ?? "");
+  });
+
+  it("fails a bearer token with too few different characters", () => {
+    const result = check(runDoctor(env({ PARMANA_SERVICE_BEARER_TOKEN: "ab".repeat(16) }), readers), "PARMANA_SERVICE_BEARER_TOKEN");
+    expect(result.level).toBe("fail");
+    expect(result.message).toContain("not random enough");
+  });
+
+  it("passes an existing policy folder whether or not it has files, because the service only needs it to exist", () => {
+    const empty = { ...readers, listDirectory: () => [] };
+    expect(check(runDoctor(env(), empty), "PARMANA_POLICY_DIR").level).toBe("pass");
+  });
+
+  it("fails when Node.js is older than 24", () => {
+    const old = { ...readers, nodeMajor: 22 };
+    expect(check(runDoctor(env(), old), "Node.js").level).toBe("fail");
+  });
+
+  it("reports a misspelt PARMANA_ setting and suggests the real name", () => {
+    const checks = runDoctor(env({ PARMANA_SERVICE_PORTT: "8080" }), readers);
+    const result = check(checks, "PARMANA_SERVICE_PORTT");
+    expect(result.level).toBe("warn");
+    expect(result.message).toContain("Did you mean PARMANA_SERVICE_PORT?");
+  });
+
+  it("does not flag the MCP server settings", () => {
+    const checks = runDoctor(env({ PARMANA_API_URL: "https://api.example.com", PARMANA_AUTHORITY_TYPE: "USER" }), readers);
+    expect(checks.some((item) => item.name === "PARMANA_API_URL")).toBe(false);
+    expect(checks.some((item) => item.name === "PARMANA_AUTHORITY_TYPE")).toBe(false);
+  });
+
+  it("suggests nothing for a name far from every real setting", () => {
+    expect(closestSetting("PARMANA_COMPLETELY_UNRELATED_THING")).toBeUndefined();
   });
 });
