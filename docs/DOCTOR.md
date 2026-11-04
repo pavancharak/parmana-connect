@@ -103,3 +103,68 @@ With these set, the service refuses to start on a mismatch. That is intended. A 
 - The fingerprint is a public value. It is safe to share when you ask for help.
 - Do not paste `.env`. It holds the bearer token, the upstream credential and the database password.
 - Doctor does not print secret values, but a shared screenshot of `.env` would.
+
+## Settings reference
+
+Every setting `doctor` reads, and what it does. Settings marked *service* are read by the execution service too. *Doctor* settings are read only by `doctor`, and only compare values.
+
+| Setting | Used by | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `PARMANA_SERVICE_BEARER_TOKEN` | service | yes | none | Shared secret that parmana-core sends. At least 32 characters, and at least 8 different characters. |
+| `PARMANA_POLICY_DIR` | service | yes | none | A folder that exists. The service does not read policy files from it. |
+| `PARMANA_PUBLIC_KEY_FILE` | service | yes | none | Path to Parmana's Ed25519 public key, in PEM. Never a private key. |
+| `PARMANA_CONNECTOR_MANIFEST` | service | yes | none | Path to the connector manifest (JSON or YAML). Its `https` base URL is checked by the loader. |
+| *upstream credential* | service | yes | none | The environment variable named by the manifest's `secretRef`. Its value is never printed. |
+| `PARMANA_RELEASE_AUDIENCE` | service | for releases | unset | The endpoint URL registered in parmana-core. Must be `https`. Unset, every release is refused with 503. |
+| `PARMANA_NONCE_STORE` | service | no | `postgres` | `postgres` for shared deployments, `memory` for one local instance. |
+| `PARMANA_DATABASE_URL` | service | with `postgres` | none | The replay database. Contains a password: never share it. |
+| `PARMANA_SERVICE_PORT` | service | no | `8080` | Port, 1 to 65535. |
+| `PARMANA_SERVICE_HOST` | service | no | `127.0.0.1` | Address to bind. Use `0.0.0.0` on a hosted service. |
+| `PARMANA_CONNECTOR_TIMEOUT_MS` | service | no | `10000` | Time limit for a connector call, 100 to 120000 ms. |
+| `PARMANA_EXPECTED_KEY_FINGERPRINT` | service and doctor | no | unset | Pins the key. When set, the service refuses to start on a mismatch. |
+| `PARMANA_EXPECTED_AUDIENCE` | service and doctor | no | unset | Pins the audience. When set, the service refuses to start unless `PARMANA_RELEASE_AUDIENCE` equals it. |
+| `PARMANA_CORE_URL` | doctor (`--online`) | for online checks | unset | parmana-core's base URL, for the key and clock comparison. Must be `https`. |
+| `PARMANA_CORE_KEY_ID` | doctor (`--online`) | no | `default` | The key ID to fetch from parmana-core. |
+
+Other `PARMANA_` names are read by the MCP server or the tests. `doctor` accepts them without a warning. Any other `PARMANA_` name is reported as a probable typo.
+
+## Troubleshooting
+
+- **`cannot reach parmana-core from Node.js (error …)`.** PowerShell or a browser can reach the URL, but Node cannot. The code in the message says why. Common codes:
+  - `ENOTFOUND`: the host name does not resolve. Check `PARMANA_CORE_URL` for a typo.
+  - `UND_ERR_CONNECT_TIMEOUT` or `ETIMEDOUT`: the connection is blocked or slow. Check a proxy or firewall.
+  - `UNABLE_TO_VERIFY_LEAF_SIGNATURE` or `SELF_SIGNED_CERT_IN_CHAIN`: a certificate Node does not trust, often added by a corporate proxy. Node uses its own certificate store, so the proxy's root certificate must be made available to Node.
+- **The output does not match this document.** Your `dist/` folder is old. Run `git pull origin doctor-command`, `npm ci`, and `npm run build` again.
+- **`Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` after the results.** The build predates the fix that sets `process.exitCode`. Rebuild.
+- **`Missing script: "doctor"`.** You are on a branch or `main` without the doctor command. Check out the branch that has it.
+
+## Maintaining doctor
+
+- **A new check.** Add it in `src/doctor.ts` (offline) or `src/doctor-online.ts` (online). Give it a test in `tests/doctor.test.ts` or `tests/doctor-online.test.ts`. Add its row to the table in this file and a line to the README.
+- **A new `PARMANA_` setting.** Add it to `KNOWN_SETTINGS` in `src/doctor.ts`, or `doctor` will report it as a typo. Add it to the settings reference above.
+- **Messages.** Name the setting, never its value. Never print a URL that contains a password. Report database errors by code only.
+- **Before pushing.** Run `npm run typecheck` and `npm test`, and the secret scan described below.
+
+## Secret scanning
+
+CI runs gitleaks (version 8.28.0) on every pull request. It scans each commit from the base branch to the tip, not only the tip. A secret that was removed in a later commit still fails the check, because it remains in the history of the pull request.
+
+Run the same check locally before you push:
+
+```bash
+go install github.com/zricethezav/gitleaks/v8@v8.28.0
+gitleaks detect --source . --log-opts="origin/main..HEAD" --redact --no-banner --exit-code 1
+```
+
+Exit code `0` means clean. Output is redacted; use `--report-format json --report-path report.json` to see the rule, file and line.
+
+Two findings have already happened in this repository:
+- A connection string with a password in a test fixture.
+- A fixed hex string assigned to a variable named `TOKEN`, which matches the generic API key rule.
+
+To avoid both:
+- Do not write `scheme://user:password@host` anywhere, even in tests. The test needs only the host.
+- Generate test secrets at run time, for example with `crypto.randomBytes`, rather than writing them as literals.
+- Do not add an allowlist entry unless the value is a documented, reviewed false positive. If you add one, keep it narrow: one exact value per entry, with a comment.
+
+If a finding is in an earlier commit of a pull request, fix it by squashing the pull request's commits into one clean commit and force-pushing with a lease. Get the owner's agreement first, because it rewrites a shared branch.
