@@ -29,3 +29,7 @@ The four `@parmana/*` packages are published 0.1.0 versions. Do not change them 
 ## Secrets
 
 Never commit a key, token or connection string. Configuration comes from the environment. See [docs/END-TO-END.md](docs/END-TO-END.md#3-start-the-execution-service) for the settings.
+
+- Test fixtures must not look like credentials. Generate secret values at run time, and never write a password inside a URL.
+- CI runs gitleaks on every commit in a pull request, so run the scan locally before you push. The command and the two findings that prompted this rule are in [docs/DOCTOR.md](docs/DOCTOR.md#secret-scanning).
+
