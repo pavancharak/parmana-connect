@@ -20,11 +20,53 @@ export interface Check {
 export interface DoctorReaders {
   readonly readFile: (path: string) => string;
   readonly directoryExists: (path: string) => boolean;
+  /** Names of the entries in a folder. Empty when the folder cannot be read. */
+  readonly listDirectory: (path: string) => string[];
+  /** The major version of the Node.js running doctor. */
+  readonly nodeMajor: number;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
 
 const MIN_TOKEN_LENGTH = 32;
+const MIN_DISTINCT_TOKEN_CHARACTERS = 8;
+const REQUIRED_NODE_MAJOR = 24;
+
+/**
+ * Every PARMANA_ name that any Parmana component reads. Names outside this list
+ * are reported, because a misspelt setting is otherwise ignored without a word.
+ * The MCP and test settings are included so they are not flagged here.
+ */
+export const KNOWN_SETTINGS: readonly string[] = [
+  // connector service
+  "PARMANA_SERVICE_BEARER_TOKEN",
+  "PARMANA_POLICY_DIR",
+  "PARMANA_PUBLIC_KEY_FILE",
+  "PARMANA_CONNECTOR_MANIFEST",
+  "PARMANA_CONNECTOR_TIMEOUT_MS",
+  "PARMANA_NONCE_STORE",
+  "PARMANA_DATABASE_URL",
+  "PARMANA_RELEASE_AUDIENCE",
+  "PARMANA_SERVICE_PORT",
+  "PARMANA_SERVICE_HOST",
+  // doctor pins and online checks
+  "PARMANA_EXPECTED_KEY_FINGERPRINT",
+  "PARMANA_EXPECTED_AUDIENCE",
+  "PARMANA_CORE_URL",
+  "PARMANA_CORE_KEY_ID",
+  // MCP server
+  "PARMANA_API_URL",
+  "PARMANA_API_KEY",
+  "PARMANA_AUTHORITY_ID",
+  "PARMANA_AUTHORITY_TYPE",
+  "PARMANA_PRINCIPAL_ID",
+  "PARMANA_AUTHORIZATION_ID",
+  "PARMANA_AUTHORIZATION_PURPOSE",
+  "PARMANA_SOURCE_SYSTEM",
+  "PARMANA_SUBMITTED_BY",
+  // tests
+  "PARMANA_TEST_DATABASE_URL",
+];
 
 /**
  * Runs every check and returns all of them, unlike the service, which stops at
@@ -32,6 +74,7 @@ const MIN_TOKEN_LENGTH = 32;
  */
 export function runDoctor(env: Env, readers: DoctorReaders): Check[] {
   return [
+    checkNodeVersion(readers),
     checkBearerToken(env),
     checkPolicyDir(env, readers),
     checkPublicKey(env, readers),
@@ -39,8 +82,17 @@ export function runDoctor(env: Env, readers: DoctorReaders): Check[] {
     checkAudience(env),
     checkNonceStore(env),
     checkNumbers(env),
+    ...checkUnknownSettings(env),
     checkClock(),
   ];
+}
+
+function checkNodeVersion(readers: DoctorReaders): Check {
+  const name = "Node.js";
+  if (readers.nodeMajor < REQUIRED_NODE_MAJOR) {
+    return { name, level: "fail", message: `Node.js ${readers.nodeMajor} is running, and the service needs ${REQUIRED_NODE_MAJOR} or later`, fix: `Install Node.js ${REQUIRED_NODE_MAJOR} or later, then run npm ci again` };
+  }
+  return { name, level: "pass", message: `Node.js ${readers.nodeMajor}` };
 }
 
 function checkBearerToken(env: Env): Check {
@@ -51,6 +103,10 @@ function checkBearerToken(env: Env): Check {
   }
   if (token.length < MIN_TOKEN_LENGTH) {
     return { name, level: "fail", message: `${name} is ${token.length} characters, below the minimum of ${MIN_TOKEN_LENGTH}`, fix: `Replace ${name} with a value of at least ${MIN_TOKEN_LENGTH} characters` };
+  }
+  const distinct = new Set(token).size;
+  if (distinct < MIN_DISTINCT_TOKEN_CHARACTERS) {
+    return { name, level: "fail", message: `${name} uses only ${distinct} different characters, so it is not random enough`, fix: `Replace ${name} with a random value, for example the output of: openssl rand -hex 32` };
   }
   return { name, level: "pass", message: `${name} is set and long enough` };
 }
@@ -73,14 +129,23 @@ function checkPublicKey(env: Env, readers: DoctorReaders): Check {
   if (path === undefined || path === "") {
     return { name, level: "fail", message: `${name} is not set`, fix: `Set ${name} to the path of Parmana's Ed25519 public key in PEM form` };
   }
+  let text: string;
+  try {
+    text = readers.readFile(path);
+  } catch {
+    return { name, level: "fail", message: `${name} cannot be read`, fix: `Check that the file at ${name} exists and is readable by the service` };
+  }
+  if (/PRIVATE KEY/.test(text)) {
+    return { name, level: "fail", message: `${name} contains a private key. The service needs only the public key`, fix: "Remove the private key from this machine, and point the setting at the public key only. Treat the private key as compromised and replace it" };
+  }
   let key: KeyObject;
   try {
-    key = createPublicKey(readers.readFile(path));
+    key = createPublicKey(text);
   } catch {
-    return { name, level: "fail", message: `${name} cannot be read as a PEM public key`, fix: `Check that the file at ${name} is the PEM public key, with its BEGIN and END lines, and is readable by the service` };
+    return { name, level: "fail", message: `${name} cannot be read as a PEM public key`, fix: `Check that the file at ${name} is the PEM public key, with its BEGIN and END lines` };
   }
   if (key.asymmetricKeyType !== "ed25519") {
-    return { name, level: "fail", message: `${name} is not an Ed25519 key`, fix: `Use Parmana's Ed25519 public key. Other key types are refused` };
+    return { name, level: "fail", message: `${name} is not an Ed25519 key`, fix: "Use Parmana's Ed25519 public key. Other key types are refused" };
   }
 
   const fingerprint = fingerprintOf(key);
@@ -168,6 +233,51 @@ function checkNumbers(env: Env): Check {
     return { name: "port and timeout", level: "fail", message: problems.join("; "), fix: "Correct the value shown, then run doctor again" };
   }
   return { name: "port and timeout", level: "pass", message: "port and timeout are valid" };
+}
+
+/**
+ * A PARMANA_ setting that no component reads is almost always a typo, and the
+ * service ignores it silently. Each one is reported with the closest real name.
+ */
+function checkUnknownSettings(env: Env): Check[] {
+  const known = new Set(KNOWN_SETTINGS);
+  const unknown = Object.keys(env).filter((key) => key.startsWith("PARMANA_") && !known.has(key) && env[key] !== undefined);
+  return unknown.map((key) => {
+    const closest = closestSetting(key);
+    return {
+      name: key,
+      level: "warn" as const,
+      message: closest === undefined ? `${key} is not a setting any Parmana component reads, so it has no effect` : `${key} is not a setting any Parmana component reads. Did you mean ${closest}?`,
+      fix: closest === undefined ? "Remove it, or correct its name" : `Rename ${key} to ${closest}, or remove it`,
+    };
+  });
+}
+
+/** The known setting within two edits of the given name, if there is one. */
+export function closestSetting(name: string): string | undefined {
+  let best: string | undefined;
+  let bestDistance = 3;
+  for (const candidate of KNOWN_SETTINGS) {
+    const distance = editDistance(name, candidate);
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function editDistance(a: string, b: string): number {
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      current.push(Math.min((current[j - 1] ?? 0) + 1, (previous[j] ?? 0) + 1, (previous[j - 1] ?? 0) + cost));
+    }
+    previous = current;
+  }
+  return previous[b.length] ?? 0;
 }
 
 function checkClock(): Check {

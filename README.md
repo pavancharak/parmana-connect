@@ -85,6 +85,41 @@ Run `npm run doctor` before starting the service. It runs every configuration ch
 
 Set `PARMANA_EXPECTED_KEY_FINGERPRINT` and `PARMANA_EXPECTED_AUDIENCE` to pin the key and the audience. With those set, the service refuses to start when either differs from the pinned value. Without them, `doctor` warns that the values were not compared, and the service starts as before.
 
+### What doctor checks
+
+Offline, `npm run doctor` checks:
+
+- Node.js 24 or later
+- the bearer token: present, at least 32 characters, and random enough (not a repeated character)
+- the policy folder: set and exists (the service needs the folder, not files in it)
+- the public key file: holds a public Ed25519 key, not a private key, and matches the pinned fingerprint if one is set
+- the connector manifest, and that its upstream credential is set
+- the release audience: present and https, and equal to the pinned audience if one is set
+- the nonce store, the port and the timeout
+- every `PARMANA_` setting: a name no component reads is reported, with the closest real name as a suggestion
+
+With `--online`, it also checks the key against parmana-core, the clock against parmana-core's, and the database: reachable, the nonce table present, and INSERT and DELETE granted to the database user. The privilege check reads the grants only, and writes no rows.
+
+### Online checks
+
+`npm run doctor` works offline. Add `--online` to also check against parmana-core and the database:
+
+```bash
+npm run doctor -- --online
+```
+
+- **parmana-core key.** Fetches the key parmana-core publishes for `PARMANA_CORE_KEY_ID` (default `default`) from `PARMANA_CORE_URL`, and compares it with `PARMANA_PUBLIC_KEY_FILE`. Set `PARMANA_CORE_URL` to the parmana-core API, not another site.
+- **Clock.** Compares this machine's clock with the `Date` header parmana-core sends. A difference over 30 seconds fails.
+- **Database.** Connects to `PARMANA_DATABASE_URL` and checks that the nonce table exists. Only the error code is printed, never the connection string.
+
+Online checks that cannot run because a setting is missing show a warning, not a failure.
+
+### What doctor still does not check
+
+- **Other database permissions.** `--online` confirms the database is reachable, the table exists, and INSERT and DELETE are granted. It does not check any other privilege.
+- **Clock accuracy.** The clock is compared with parmana-core's, which is good enough to catch drift. It is not checked against a time source you trust. Keep automatic time sync on.
+- **Registration.** `doctor` does not check that the connector is registered in parmana-core. That is a step in the registration flow, not a configuration value.
+
 ## Deploying
 
 [`docs/SETUP.md`](docs/SETUP.md) gives the full steps for a Windows computer and for Render's free tier, including the environment variables and the secret files. Set `PARMANA_SERVICE_HOST=0.0.0.0` on a hosted service, set the health check path to `/health`, and register the exact `/execute` URL in Parmana as the endpoint.
