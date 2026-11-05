@@ -16,7 +16,7 @@ import { verifyExternalRelease, type SignedExternalRelease } from "../src/extern
 const DIR = join(__dirname, "fixtures", "parmana-core");
 const AUDIENCE = "https://parmana-connect.example.com/execute";
 const NOW = new Date("2026-10-29T06:00:00.000Z");
-const publicKey = createPublicKey(readFileSync(join(DIR, "core-public-key.pem"), "utf8"));
+const publicKey = createPublicKey(readFileSync(join(DIR, "core-public-key.txt"), "utf8"));
 
 function load(name: string): SignedExternalRelease {
   return JSON.parse(readFileSync(join(DIR, name), "utf8")) as SignedExternalRelease;
