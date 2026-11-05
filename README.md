@@ -22,10 +22,11 @@ For the protocol, read [connect any external system](https://docs.parmanasystems
 
 ## Reads, writes and executions
 
-Each capability in a manifest is one of two kinds, set by its `effect`:
+Each capability in a manifest is a read or a write, set by its `effect`. Every capability is also carried out by an execution, which is the release from parmana-core described below:
 
 - **Read** (`effect: read`): fetches data and changes nothing. A read must use `GET`. The manifest refuses any other method. Inputs go in the query string.
 - **Write** (`effect: write`): changes data on the business system. It uses `POST`, `PUT`, `PATCH` or `DELETE`, and must declare its inputs. `POST`, `PUT` and `PATCH` send the inputs as a JSON body. `DELETE` sends them in the query string. A `GET` cannot be a write.
+- **Execute** (not set in the manifest): the signed release from parmana-core that carries out an approved read or write. Parmana sends the release, and this service runs the call only after the checks below pass.
 
 A capability runs only when Parmana releases it. The release is signed by parmana-core, so this service accepts it only if it verifies against the trusted key, names this endpoint as its audience, is unexpired, and names a capability in the manifest. A repeated release gets the first answer back, and the action does not run twice.
 
