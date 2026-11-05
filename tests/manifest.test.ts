@@ -134,6 +134,13 @@ describe("semantic rules", () => {
     expect(errors).toContainEqual({ path: "/capabilities/0/effect", message: "a GET capability cannot be a write" });
   });
 
+  it("refuses a read capability that uses any method other than GET", () => {
+    for (const method of ["POST", "PUT", "PATCH", "DELETE"] as const) {
+      const errors = expectErrors(validateManifest(withCapability({ method, effect: "read" })));
+      expect(errors).toContainEqual({ path: "/capabilities/0/method", message: "a read capability must use GET" });
+    }
+  });
+
   it("refuses a write capability with no declared input", () => {
     const errors = expectErrors(validateManifest(withCapability({ method: "PATCH", effect: "write", input: undefined })));
     expect(errors).toContainEqual({ path: "/capabilities/0/input", message: "a write capability must declare its input" });
