@@ -1,4 +1,4 @@
-import { verify, type KeyObject } from "node:crypto";
+import { createHash, verify, type KeyObject } from "node:crypto";
 
 import { CanonicalSerializer } from "@parmana/crypto";
 import type { NonceStore } from "@parmana/envelope-verifier";
@@ -17,6 +17,14 @@ import type { NonceStore } from "@parmana/envelope-verifier";
 
 /** Key id parmana-core signs releases with. Its public key is the one this service trusts. */
 export const RELEASE_KEY_ID = "default";
+
+/**
+ * Above this many bytes, parmana-core signs a release as a SHA-512 commitment
+ * of its canonical bytes, not the raw bytes (packages/crypto/src/SignatureCommitment.ts,
+ * ADR-0010). The limit and the prefix must match parmana-core exactly.
+ */
+const KMS_RAW_MESSAGE_LIMIT_BYTES = 4096;
+const COMMITMENT_PREFIX = Buffer.from("PARMANA-ED25519-LARGE-MESSAGE-V1\0", "utf8");
 
 /** How far the clock may be behind before an expired release is refused, in milliseconds. */
 const CLOCK_SKEW_MS = 30_000;
@@ -139,7 +147,13 @@ function signatureVerifies(
 ): boolean {
   try {
     const bytes = new CanonicalSerializer().serialize(release);
-    return verify(null, bytes, publicKey, Buffer.from(value, "base64"));
+    const signature = Buffer.from(value, "base64");
+    if (verify(null, bytes, publicKey, signature)) return true;
+    // A commitment is accepted only above the limit, so it cannot stand in
+    // for a signature over a small message. parmana-core does the same.
+    if (bytes.length <= KMS_RAW_MESSAGE_LIMIT_BYTES) return false;
+    const commitment = Buffer.concat([COMMITMENT_PREFIX, createHash("sha512").update(bytes).digest()]);
+    return verify(null, commitment, publicKey, signature);
   } catch {
     return false;
   }
