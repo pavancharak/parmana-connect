@@ -53,6 +53,7 @@ node --env-file=.env dist/main.js
 | `PARMANA_POLICY_DIR`           | Yes             | none        | An existing folder. Required by the crypto setup.                                                              |
 | `PARMANA_RELEASE_AUDIENCE`     | For releases    | unset       | The endpoint URL as registered in Parmana, for example `https://service.example.com/execute`. Must be `https`. |
 | `PARMANA_EXPECTED_KEY_FINGERPRINT` | No          | unset       | Pins the key. The service refuses to start unless the key in `PARMANA_PUBLIC_KEY_FILE` has this `sha256:` fingerprint. Use the value you confirmed through a second channel. |
+| `PARMANA_RELEASE_ONLY`          | No       | `false`. Set `true` to accept only signed releases from parmana-core. A bearer token plus a signed authorization is then refused, so no second route reaches the connector. Requires `PARMANA_RELEASE_AUDIENCE`. |
 | `PARMANA_EXPECTED_AUDIENCE`    | No              | unset       | Pins the audience. The service refuses to start unless `PARMANA_RELEASE_AUDIENCE` equals this value exactly. |
 | `PARMANA_NONCE_STORE`          | No              | `postgres`  | `postgres` shares replay records across instances. `memory` is for one instance only.                          |
 | `PARMANA_DATABASE_URL`         | With `postgres` | none        | Connection string for the replay store.                                                                        |

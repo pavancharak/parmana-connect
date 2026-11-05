@@ -24,6 +24,7 @@ async function main(): Promise<void> {
   const service = createExecutionService({
     bearerToken: config.bearerToken,
     releaseAudience: config.releaseAudience,
+    releaseOnly: config.releaseOnly,
     publicKey: config.publicKey,
     connector,
     resolveCredential: () => {

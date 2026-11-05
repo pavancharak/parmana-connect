@@ -46,6 +46,11 @@ export interface ExecutionServiceOptions {
    * refuses signed releases with 503.
    */
   readonly releaseAudience?: string | undefined;
+  /**
+   * When true, a bearer token plus a signed authorization is refused. Only a
+   * signed release from parmana-core runs. Defaults to false.
+   */
+  readonly releaseOnly?: boolean | undefined;
 }
 
 const DEFAULT_MAX_BODY_BYTES = 256 * 1024;
@@ -141,6 +146,10 @@ export function createExecutionService(options: ExecutionServiceOptions) {
 
     if (isSignedExternalRelease(body)) {
       return handleExternalRelease(body, res);
+    }
+
+    if (options.releaseOnly === true) {
+      return send(res, 403, { error: "release-only: send a signed release from parmana-core" });
     }
 
     if (!isAuthorized(req, expectedAuthorization)) {
