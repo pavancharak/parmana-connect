@@ -47,6 +47,7 @@ export const KNOWN_SETTINGS: readonly string[] = [
   "PARMANA_NONCE_STORE",
   "PARMANA_DATABASE_URL",
   "PARMANA_RELEASE_AUDIENCE",
+  "PARMANA_RELEASE_ONLY",
   "PARMANA_SERVICE_PORT",
   "PARMANA_SERVICE_HOST",
   // doctor pins and online checks

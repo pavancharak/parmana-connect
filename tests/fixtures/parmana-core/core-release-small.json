@@ -1,0 +1,30 @@
+{
+  "release": {
+    "version": 1,
+    "connectorId": "ext-example:item-fetch",
+    "audience": "https://parmana-connect.example.com/execute",
+    "businessTransactionId": "fixture-small",
+    "authorizationId": "66666666-7777-4888-8999-aaaaaaaaaaaa",
+    "capability": "example:item-fetch",
+    "target": "items/123",
+    "parameters": {
+      "itemId": "123",
+      "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "unicode": "naïve ✓"
+    },
+    "policy": {
+      "name": "policy-a",
+      "version": "1.0.0"
+    },
+    "approvedBy": [],
+    "issuedAt": "2026-10-29T05:59:00.000Z",
+    "expiresAt": "2099-01-01T00:00:00.000Z"
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "keyId": "default",
+    "value": "cyiU6x45DGwdQ1PIIAJKmKQgL4Ojo9TYoEfpwep2FTZ/Z93+1QOTQU5aQk08YBzQGKkNIdlXz7t9LLSMQVM8BQ=="
+  },
+  "bytes": 564,
+  "commitment": false
+}
