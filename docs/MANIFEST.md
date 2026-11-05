@@ -30,7 +30,7 @@ Each capability:
 | `id` | `<system>:<name>`, lowercase. Must start with the manifest's `system`. Unique in the manifest |
 | `method` | `GET`, `POST`, `PUT`, `PATCH` or `DELETE` |
 | `path` | Starts with `/`, up to 512 characters, no query or fragment. May contain `{name}` placeholders |
-| `effect` | `read` or `write`. A `GET` cannot be a `write` |
+| `effect` | `read` or `write`. A `GET` cannot be a `write`, and a `read` must use `GET` |
 | `input` | Up to 50 inputs. Each has a `type` (`string`, `number`, `integer`, `boolean`, `object` or `array`) and an optional `required` flag |
 
 Further rules: a `write` capability must declare at least one input, and every `{name}` in its path must be a declared input marked `required: true`.

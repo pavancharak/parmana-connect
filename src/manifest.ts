@@ -115,6 +115,11 @@ function semanticChecks(m: Manifest, options: ValidateOptions): ManifestError[] 
       errors.push({ path: `${at}/effect`, message: "a GET capability cannot be a write" });
     }
 
+    // A read must not send a body or change state: only GET is a read.
+    if (cap.effect === "read" && cap.method !== "GET") {
+      errors.push({ path: `${at}/method`, message: "a read capability must use GET" });
+    }
+
     const input = cap.input ?? {};
     if (cap.effect === "write" && Object.keys(input).length === 0) {
       errors.push({ path: `${at}/input`, message: "a write capability must declare its input" });
