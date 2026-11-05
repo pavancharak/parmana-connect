@@ -20,6 +20,25 @@ Parmana checks the policy and the approval, signs the decision, and releases the
 
 For the protocol, read [connect any external system](https://docs.parmanasystems.com/guides/connect-any-external-system). For the service in detail, read [the parmana-connect service](https://docs.parmanasystems.com/connectors/parmana-connect).
 
+## Reads, writes and executions
+
+Each capability in a manifest is one of two kinds, set by its `effect`:
+
+- **Read** (`effect: read`): fetches data and changes nothing. A read must use `GET`. The manifest refuses any other method. Inputs go in the query string.
+- **Write** (`effect: write`): changes data on the business system. It uses `POST`, `PUT`, `PATCH` or `DELETE`, and must declare its inputs. `POST`, `PUT` and `PATCH` send the inputs as a JSON body. `DELETE` sends them in the query string. A `GET` cannot be a write.
+
+A capability runs only when Parmana releases it. The release is signed by parmana-core, so this service accepts it only if it verifies against the trusted key, names this endpoint as its audience, is unexpired, and names a capability in the manifest. A repeated release gets the first answer back, and the action does not run twice.
+
+The service also accepts a bearer token with a signed authorization. That path is refused when `PARMANA_RELEASE_ONLY=true`. The default is `false`, so the path is open until that setting is turned on (G-130).
+
+Limits that apply to every call:
+
+- The upstream response is capped at 1 MB, and redirects are refused.
+- Results over 16 KB are refused by parmana-core, so the service returns an error instead.
+- The default upstream timeout is 10 seconds.
+- The read-must-use-`GET` rule is in pull request #36 and is not yet on `main`.
+- This path has not yet been run against a deployed parmana-core (G-133).
+
 ## Quick start
 
 Requires Node.js 24 or later.
