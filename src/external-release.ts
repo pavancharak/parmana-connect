@@ -76,14 +76,15 @@ export function isSignedExternalRelease(
 }
 
 /**
- * Verifies a signed release. Returns the release only when every check passes.
- * The replay record is written last, so a release that fails any other check,
- * including a capability this endpoint does not serve, does not use up its
- * businessTransactionId.
+ * Checks a signed release without recording it as executed. Every check except
+ * replay: shape, signature, capability, audience and expiry. The caller decides
+ * what to do with a release that passes, for example whether it has already
+ * been answered. Use this before reading any stored answer, so that only a
+ * genuine release can receive one.
  */
-export async function verifyExternalRelease(
+export async function checkExternalRelease(
   body: SignedExternalRelease,
-  options: ExternalReleaseOptions,
+  options: Omit<ExternalReleaseOptions, "nonceStore">,
 ): Promise<ExternalReleaseCheck> {
   const { release, signature } = body;
   const errors = shapeErrors(release);
@@ -126,9 +127,24 @@ export async function verifyExternalRelease(
     return { valid: false, errors };
   }
 
+  return { valid: true, release };
+}
+
+/**
+ * Verifies a signed release and records its businessTransactionId as used.
+ * Returns the release only when every check passes, and the replay record is
+ * written last, so a release that fails another check does not use up its id.
+ */
+export async function verifyExternalRelease(
+  body: SignedExternalRelease,
+  options: ExternalReleaseOptions,
+): Promise<ExternalReleaseCheck> {
+  const check = await checkExternalRelease(body, options);
+  if (!check.valid) return check;
+
   const fresh = await options.nonceStore.checkAndRecord(
-    `release:${release.businessTransactionId}`,
-    release.expiresAt,
+    `release:${check.release.businessTransactionId}`,
+    check.release.expiresAt,
   );
   if (!fresh) {
     return {
@@ -137,7 +153,7 @@ export async function verifyExternalRelease(
     };
   }
 
-  return { valid: true, release };
+  return check;
 }
 
 function signatureVerifies(

@@ -55,7 +55,7 @@ node --env-file=.env dist/main.js
 | `PARMANA_EXPECTED_KEY_FINGERPRINT` | No          | unset       | Pins the key. The service refuses to start unless the key in `PARMANA_PUBLIC_KEY_FILE` has this `sha256:` fingerprint. Use the value you confirmed through a second channel. |
 | `PARMANA_RELEASE_ONLY`          | No       | `false`. Set `true` to accept only signed releases from parmana-core. A bearer token plus a signed authorization is then refused, so no second route reaches the connector. Requires `PARMANA_RELEASE_AUDIENCE`. |
 | `PARMANA_EXPECTED_AUDIENCE`    | No              | unset       | Pins the audience. The service refuses to start unless `PARMANA_RELEASE_AUDIENCE` equals this value exactly. |
-| `PARMANA_NONCE_STORE`          | No              | `postgres`  | `postgres` shares replay records across instances. `memory` is for one instance only.                          |
+| `PARMANA_NONCE_STORE`          | No              | `postgres`  | `postgres` shares replay records and each release's first answer across instances. `memory` is for one instance only. Run `npm run migrate` to create both tables. |
 | `PARMANA_DATABASE_URL`         | With `postgres` | none        | Connection string for the replay store.                                                                        |
 | `PARMANA_SERVICE_PORT`         | No              | `8080`      | Port to listen on.                                                                                             |
 | `PARMANA_SERVICE_HOST`         | No              | `127.0.0.1` | Address to bind. Use `0.0.0.0` on a hosted service.                                                            |

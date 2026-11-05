@@ -216,12 +216,13 @@ describe("release-only endpoint", () => {
     expect(upstreamCalls).toEqual([{ path: "/items/123", auth: `Bearer ${SECRET}` }]);
   });
 
-  it("refuses a second run of the same signed release", async () => {
+  it("answers a second run of the same signed release with the first answer, without running it again", async () => {
     const signed = signRelease(release());
-    expect((await post(signed)).status).toBe(200);
+    const first = await post(signed);
     const again = await post(signed);
 
-    expect(again.status).toBe(403);
+    expect(again.status).toBe(200);
+    expect(again.json).toEqual(first.json);
     expect(upstreamCalls).toHaveLength(1);
   });
 });

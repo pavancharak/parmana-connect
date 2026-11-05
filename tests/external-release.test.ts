@@ -250,18 +250,19 @@ describe("POST /execute with a signed release", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("refuses a second run of the same release with 403, and does not call the connector", async () => {
+  it("answers a second run of the same release with the first answer, and does not call the connector again", async () => {
     const body = signed(
       release({
         businessTransactionId: "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
       }),
     );
-    await post(body);
+    const first = await post(body);
     const before = calls.length;
 
-    const { status } = await post(body);
+    const second = await post(body);
 
-    expect(status).toBe(403);
+    expect(second.status).toBe(200);
+    expect(second.json).toEqual(first.json);
     expect(calls.length).toBe(before);
   });
 });
