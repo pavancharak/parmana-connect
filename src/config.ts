@@ -1,5 +1,6 @@
 import { createPublicKey, type KeyObject } from "node:crypto";
 
+import { fingerprintOf } from "./fingerprint.js";
 import { loadManifest, type Manifest } from "./manifest.js";
 
 /**
@@ -23,6 +24,11 @@ export interface ServiceConfig {
   readonly databaseUrl?: string | undefined;
   /** The endpoint URL registered in parmana-core, for signed releases. Unset, those are refused. */
   readonly releaseAudience?: string | undefined;
+  /**
+   * When true, only signed releases from parmana-core run. A bearer token plus
+   * a signed authorization is refused, so no second route reaches the connector.
+   */
+  readonly releaseOnly: boolean;
 }
 
 export interface ConfigReaders {
@@ -65,8 +71,29 @@ export function loadServiceConfig(
   const databaseUrl = nonceStore === "postgres" ? required(env, "PARMANA_DATABASE_URL") : undefined;
 
   const releaseAudience = optionalHttpsUrl(env, "PARMANA_RELEASE_AUDIENCE");
+  const releaseOnly = parseBoolean(env.PARMANA_RELEASE_ONLY, "PARMANA_RELEASE_ONLY");
+  if (releaseOnly && releaseAudience === undefined) {
+    throw new ConfigError("PARMANA_RELEASE_ONLY=true requires PARMANA_RELEASE_AUDIENCE, or every request would be refused");
+  }
 
-  return { port, host, bearerToken, publicKey, manifest, credentialVariable, timeoutMs, nonceStore, databaseUrl, releaseAudience };
+  // Optional pins. When set, startup stops unless the running key and audience match them exactly.
+  const expectedFingerprint = env.PARMANA_EXPECTED_KEY_FINGERPRINT;
+  if (expectedFingerprint !== undefined && expectedFingerprint !== "" && expectedFingerprint !== fingerprintOf(publicKey)) {
+    throw new ConfigError(
+      "PARMANA_EXPECTED_KEY_FINGERPRINT does not match the key in PARMANA_PUBLIC_KEY_FILE. Check the key, or update the pinned value after confirming a rotation",
+    );
+  }
+  const expectedAudience = env.PARMANA_EXPECTED_AUDIENCE;
+  if (expectedAudience !== undefined && expectedAudience !== "") {
+    if (releaseAudience === undefined) {
+      throw new ConfigError("PARMANA_EXPECTED_AUDIENCE is set, but PARMANA_RELEASE_AUDIENCE is not");
+    }
+    if (releaseAudience !== expectedAudience) {
+      throw new ConfigError("PARMANA_RELEASE_AUDIENCE does not match PARMANA_EXPECTED_AUDIENCE");
+    }
+  }
+
+  return { port, host, bearerToken, publicKey, manifest, credentialVariable, timeoutMs, nonceStore, databaseUrl, releaseAudience, releaseOnly };
 }
 
 export class ConfigError extends Error {
@@ -105,6 +132,13 @@ function parseNonceStore(raw: string | undefined): "postgres" | "memory" {
   if (raw === undefined || raw === "postgres") return "postgres";
   if (raw === "memory") return "memory";
   throw new ConfigError("PARMANA_NONCE_STORE must be postgres or memory");
+}
+
+/** Unset means false. Only the exact strings true and false are accepted. */
+function parseBoolean(raw: string | undefined, name: string): boolean {
+  if (raw === undefined || raw === "" || raw === "false") return false;
+  if (raw === "true") return true;
+  throw new ConfigError(`${name} must be true or false`);
 }
 
 function parseInteger(raw: string, name: string, min: number, max: number): number {

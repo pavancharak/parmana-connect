@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 
+import { CREATE_RELEASE_LEDGER_SQL } from "./release-ledger.js";
 import { CREATE_NONCE_TABLE_SQL } from "./postgres-nonce-store.js";
 
 /**
@@ -14,6 +15,7 @@ async function main(): Promise<void> {
   const pool = new Pool({ connectionString: url });
   try {
     await pool.query(CREATE_NONCE_TABLE_SQL);
+    await pool.query(CREATE_RELEASE_LEDGER_SQL);
     console.log("migration applied");
   } finally {
     await pool.end();

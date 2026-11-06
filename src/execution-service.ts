@@ -7,11 +7,12 @@ import { toExecutableContent, type SignedExecutionAuthorization } from "@parmana
 
 import { ConnectorError, type GenericConnector } from "./connector.js";
 import {
+  checkExternalRelease,
   isSignedExternalRelease,
-  verifyExternalRelease,
   type ExternalRelease,
   type SignedExternalRelease,
 } from "./external-release.js";
+import { MemoryReleaseLedger, type ReleaseLedger } from "./release-ledger.js";
 
 /** Largest result parmana-core accepts from an external endpoint, in bytes. */
 const EXTERNAL_RESULT_LIMIT_BYTES = 16 * 1024;
@@ -46,6 +47,17 @@ export interface ExecutionServiceOptions {
    * refuses signed releases with 503.
    */
   readonly releaseAudience?: string | undefined;
+  /**
+   * When true, a bearer token plus a signed authorization is refused. Only a
+   * signed release from parmana-core runs. Defaults to false.
+   */
+  readonly releaseOnly?: boolean | undefined;
+  /**
+   * Records each release's first answer, so a repeat gets it back and never runs
+   * twice. Must be shared across instances. Defaults to an in-memory ledger,
+   * which protects one instance only.
+   */
+  readonly releaseLedger?: ReleaseLedger | undefined;
 }
 
 const DEFAULT_MAX_BODY_BYTES = 256 * 1024;
@@ -67,27 +79,44 @@ export function createExecutionService(options: ExecutionServiceOptions) {
   const hasher = new ExecutableContentHasher(CryptoBootstrap.create());
   const expectedAuthorization = Buffer.from(`Bearer ${options.bearerToken}`);
 
+  const releaseLedger = options.releaseLedger ?? new MemoryReleaseLedger();
+
   const handleExternalRelease = async (body: SignedExternalRelease, res: ServerResponse): Promise<void> => {
     if (options.releaseAudience === undefined) {
       return send(res, 503, { error: "this endpoint has no release audience configured" });
     }
 
-    // No bearer token here: the signature is the authentication.
-    const check = await verifyExternalRelease(body, {
+    // No bearer token here: the signature is the authentication. The check
+    // runs before the ledger is read, so an unsigned request never sees a stored answer.
+    const check = await checkExternalRelease(body, {
       publicKey: options.publicKey,
       audience: options.releaseAudience,
       capabilities: options.connector.capabilities,
       now: new Date(),
-      nonceStore: releaseNonceStore,
     });
     if (!check.valid) {
       return send(res, 403, { error: "release refused", errors: check.errors });
     }
 
-    return answerRelease(check.release, res);
+    const { release } = check;
+    const claim = await releaseLedger.claim(release.businessTransactionId, release.expiresAt);
+    if (!claim.claimed) {
+      // A repeat gets the first answer. Nothing runs again.
+      if (claim.answer !== undefined) return send(res, 200, claim.answer);
+      return send(res, 409, { error: "this release is already being executed; retry later" });
+    }
+
+    const answer = await runRelease(release);
+    try {
+      await releaseLedger.complete(release.businessTransactionId, answer);
+    } catch {
+      // The action has run and the answer is in hand. A repeat finds the claim without an
+      // answer and gets 409, so nothing runs twice. The operator resolves it.
+    }
+    return send(res, 200, answer);
   };
 
-  const answerRelease = async (release: ExternalRelease, res: ServerResponse): Promise<void> => {
+  const runRelease = async (release: ExternalRelease): Promise<Record<string, unknown>> => {
     let success: boolean;
     let result: Record<string, unknown>;
 
@@ -116,13 +145,13 @@ export function createExecutionService(options: ExecutionServiceOptions) {
       result = { error: "result is larger than 16 KB" };
     }
 
-    return send(res, 200, {
+    return {
       businessTransactionId: release.businessTransactionId,
       capability: release.capability,
       success,
       result,
       executedAt: new Date().toISOString(),
-    });
+    };
   };
 
   const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
@@ -141,6 +170,10 @@ export function createExecutionService(options: ExecutionServiceOptions) {
 
     if (isSignedExternalRelease(body)) {
       return handleExternalRelease(body, res);
+    }
+
+    if (options.releaseOnly === true) {
+      return send(res, 403, { error: "release-only: send a signed release from parmana-core" });
     }
 
     if (!isAuthorized(req, expectedAuthorization)) {
@@ -184,6 +217,23 @@ export function createExecutionService(options: ExecutionServiceOptions) {
       return send(res, 403, { error: "authorization does not cover this action" });
     }
 
+    // One execution per businessTransactionId, whatever the nonce. Two
+    // distinct authorizations for the same transaction share this claim, so
+    // the second one gets the first answer and the connector does not run again.
+    const claim = await releaseLedger.claim(
+      request.businessTransactionId,
+      request.authorization.payload.expiresAt,
+    );
+    if (!claim.claimed) {
+      if (claim.answer !== undefined) {
+        const stored = claim.answer as { status: number; body: Record<string, unknown> };
+        return send(res, stored.status, stored.body);
+      }
+      return send(res, 409, { error: "this transaction is already being executed; retry later" });
+    }
+
+    let status: number;
+    let answerBody: Record<string, unknown>;
     try {
       const response = await options.connector.execute(
         { capability: request.action, parameters: request.parameters },
@@ -196,7 +246,8 @@ export function createExecutionService(options: ExecutionServiceOptions) {
           timeoutMs: options.timeoutMs ?? 10_000,
         },
       );
-      return send(res, 200, {
+      status = 200;
+      answerBody = {
         businessTransactionId: request.businessTransactionId,
         action: request.action,
         target: request.target,
@@ -204,10 +255,19 @@ export function createExecutionService(options: ExecutionServiceOptions) {
         success: response.success,
         executedAt: new Date().toISOString(),
         metadata: response.metadata,
-      });
+      };
     } catch (err) {
-      return send(res, connectorStatus(err), { error: connectorMessage(err) });
+      status = connectorStatus(err);
+      answerBody = { error: connectorMessage(err) };
     }
+
+    try {
+      await releaseLedger.complete(request.businessTransactionId, { status, body: answerBody });
+    } catch {
+      // The connector has run and the answer is in hand. A repeat finds the claim without
+      // an answer and gets 409, so nothing runs twice. The operator resolves it.
+    }
+    return send(res, status, answerBody);
   };
 
   return {

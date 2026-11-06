@@ -85,18 +85,21 @@ beforeEach(() => {
 });
 
 /** Signs an approval the way parmana-core does, then builds the request it would send. */
-async function approvedRequest(parameters: Record<string, unknown>): Promise<ExecutionRequest> {
+async function approvedRequest(
+  parameters: Record<string, unknown>,
+  transaction: string = TRANSACTION,
+): Promise<ExecutionRequest> {
   const content = toExecutableContent({
-    businessTransactionId: TRANSACTION,
+    businessTransactionId: transaction,
     action: ACTION,
     target: TARGET,
     parameters,
   });
   const authorization = await new AuthorizationSigner(crypto).sign(
     {
-      decisionId: `decision-${TRANSACTION}-${Math.random()}`,
+      decisionId: `decision-${transaction}-${Math.random()}`,
       decisionOutcome: "APPROVED",
-      businessTransactionId: TRANSACTION,
+      businessTransactionId: transaction,
       policyName: "policy-a",
       policyVersion: "1.0.0",
       policyContentHash: await trustHasher.hash({ policy: "policy-a" }),
@@ -109,7 +112,7 @@ async function approvedRequest(parameters: Record<string, unknown>): Promise<Exe
     60,
   );
   return {
-    businessTransactionId: TRANSACTION,
+    businessTransactionId: transaction,
     action: ACTION,
     target: TARGET,
     parameters,
@@ -143,7 +146,8 @@ describe("parmana-core HttpExecutionSystem -> execution service", () => {
   });
 
   it("refuses the same approved action a second time", async () => {
-    const request = await approvedRequest({ itemId: "123" });
+    // A fresh transaction, so an earlier test's execution does not answer from the ledger.
+    const request = await approvedRequest({ itemId: "123" }, "txn-e2e-replay");
 
     await executionSystem().execute(request);
     await expect(executionSystem().execute(request)).rejects.toThrow("Execution System returned HTTP 403.");

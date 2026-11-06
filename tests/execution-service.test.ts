@@ -12,6 +12,7 @@ import { toExecutableContent } from "@parmana/shared";
 
 import { createGenericConnector } from "../src/connector.js";
 import { createExecutionService } from "../src/execution-service.js";
+import { MemoryReleaseLedger } from "../src/release-ledger.js";
 
 // CryptoBootstrap reads PARMANA_POLICY_DIR. It only needs a directory here.
 process.env.PARMANA_POLICY_DIR ??= mkdtempSync(join(tmpdir(), "parmana-policies-"));
@@ -34,6 +35,8 @@ let upstreamCalls: { path: string; auth: string | undefined }[] = [];
 let service: Server;
 let serviceUrl: string;
 let serviceCalls = 0;
+// Swapped for a fresh ledger before each test, so each test starts with no claimed transactions.
+let currentLedger = new MemoryReleaseLedger();
 
 beforeAll(async () => {
   upstream = createServer((req, res) => {
@@ -70,6 +73,10 @@ beforeAll(async () => {
     resolveCredential: () => SECRET,
     credentialId: "EXAMPLE_TOKEN",
     nonceStore: new MemoryNonceStore(),
+    releaseLedger: {
+      claim: (id, expiresAt) => currentLedger.claim(id, expiresAt),
+      complete: (id, answer) => currentLedger.complete(id, answer),
+    },
   });
   service = await handler.listen(0);
   serviceUrl = `http://127.0.0.1:${(service.address() as AddressInfo).port}`;
@@ -82,6 +89,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   upstreamCalls = [];
+  currentLedger = new MemoryReleaseLedger();
 });
 
 async function authorize(overrides: { parameters?: Record<string, unknown>; grantedCapability?: string } = {}) {
@@ -194,6 +202,34 @@ describe("execution service", () => {
 
     expect(first.status).toBe(200);
     expect(second.status).toBe(403);
+    expect(upstreamCalls).toHaveLength(1);
+  });
+
+  it("runs the connector once for two distinct authorizations of the same transaction", async () => {
+    // Each authorize() call has its own decision and nonce, so both pass the
+    // envelope checks. Only the business transaction ID is shared.
+    const first = await authorize();
+    const second = await authorize();
+    expect(first.signed.payload.nonce).not.toBe(second.signed.payload.nonce);
+
+    const firstResult = await post(body(first.signed));
+    const secondResult = await post(body(second.signed));
+
+    expect(firstResult.status).toBe(200);
+    expect(secondResult.status).toBe(200);
+    expect(secondResult.json).toEqual(firstResult.json);
+    expect(upstreamCalls).toHaveLength(1);
+  });
+
+  it("does not let a refused request use up the transaction, so a valid one still runs", async () => {
+    // Separate authorizations: a refused request still uses up its nonce.
+    const refused = await authorize();
+    const approved = await authorize();
+    const tampered = await post(body(refused.signed, { itemId: "999" }));
+    const valid = await post(body(approved.signed));
+
+    expect(tampered.status).toBe(403);
+    expect(valid.status).toBe(200);
     expect(upstreamCalls).toHaveLength(1);
   });
 

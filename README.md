@@ -20,6 +20,26 @@ Parmana checks the policy and the approval, signs the decision, and releases the
 
 For the protocol, read [connect any external system](https://docs.parmanasystems.com/guides/connect-any-external-system). For the service in detail, read [the parmana-connect service](https://docs.parmanasystems.com/connectors/parmana-connect).
 
+## Reads, writes and executions
+
+Each capability in a manifest is a read or a write, set by its `effect`. Every capability is also carried out by an execution, which is the release from parmana-core described below:
+
+- **Read** (`effect: read`): fetches data and changes nothing. A read must use `GET`. The manifest refuses any other method. Inputs go in the query string.
+- **Write** (`effect: write`): changes data on the business system. It uses `POST`, `PUT`, `PATCH` or `DELETE`, and must declare its inputs. `POST`, `PUT` and `PATCH` send the inputs as a JSON body. `DELETE` sends them in the query string. A `GET` cannot be a write.
+- **Execute** (not set in the manifest): the signed release from parmana-core that carries out an approved read or write. Parmana sends the release, and this service runs the call only after the checks below pass.
+
+A capability runs only when Parmana releases it. The release is signed by parmana-core, so this service accepts it only if it verifies against the trusted key, names this endpoint as its audience, is unexpired, and names a capability in the manifest. A repeated release gets the first answer back, and the action does not run twice.
+
+The service also accepts a bearer token with a signed authorization. That path is refused when `PARMANA_RELEASE_ONLY=true`. The default is `false`, so the path is open until that setting is turned on (G-130).
+
+Limits that apply to every call:
+
+- The upstream response is capped at 1 MB, and redirects are refused.
+- Results over 16 KB are refused by parmana-core, so the service returns an error instead.
+- The default upstream timeout is 10 seconds.
+- The read-must-use-`GET` rule is in pull request #36 and is not yet on `main`.
+- This path has not yet been run against a deployed parmana-core (G-133).
+
 ## Quick start
 
 Requires Node.js 24 or later.
@@ -52,7 +72,10 @@ node --env-file=.env dist/main.js
 | The manifest's `secretRef`     | Yes             | none        | The environment variable holding the upstream credential.                                                      |
 | `PARMANA_POLICY_DIR`           | Yes             | none        | An existing folder. Required by the crypto setup.                                                              |
 | `PARMANA_RELEASE_AUDIENCE`     | For releases    | unset       | The endpoint URL as registered in Parmana, for example `https://service.example.com/execute`. Must be `https`. |
-| `PARMANA_NONCE_STORE`          | No              | `postgres`  | `postgres` shares replay records across instances. `memory` is for one instance only.                          |
+| `PARMANA_EXPECTED_KEY_FINGERPRINT` | No          | unset       | Pins the key. The service refuses to start unless the key in `PARMANA_PUBLIC_KEY_FILE` has this `sha256:` fingerprint. Use the value you confirmed through a second channel. |
+| `PARMANA_RELEASE_ONLY`          | No       | `false`. Set `true` to accept only signed releases from parmana-core. A bearer token plus a signed authorization is then refused, so no second route reaches the connector. Requires `PARMANA_RELEASE_AUDIENCE`. |
+| `PARMANA_EXPECTED_AUDIENCE`    | No              | unset       | Pins the audience. The service refuses to start unless `PARMANA_RELEASE_AUDIENCE` equals this value exactly. |
+| `PARMANA_NONCE_STORE`          | No              | `postgres`  | `postgres` shares replay records and each release's first answer across instances. `memory` is for one instance only. Run `npm run migrate` to create both tables. |
 | `PARMANA_DATABASE_URL`         | With `postgres` | none        | Connection string for the replay store.                                                                        |
 | `PARMANA_SERVICE_PORT`         | No              | `8080`      | Port to listen on.                                                                                             |
 | `PARMANA_SERVICE_HOST`         | No              | `127.0.0.1` | Address to bind. Use `0.0.0.0` on a hosted service.                                                            |
@@ -76,6 +99,47 @@ The service refuses to start when a required setting is missing, and the error n
 | `PARMANA_SUBMITTED_BY`          | No       | Defaults to the principal.                              |
 
 Start the MCP server with `npm run mcp`.
+
+### Check the configuration
+
+Run `npm run doctor` before starting the service. It runs every configuration check and lists all the problems at once, each with a fix. It never prints a secret value.
+
+Set `PARMANA_EXPECTED_KEY_FINGERPRINT` and `PARMANA_EXPECTED_AUDIENCE` to pin the key and the audience. With those set, the service refuses to start when either differs from the pinned value. Without them, `doctor` warns that the values were not compared, and the service starts as before.
+
+### What doctor checks
+
+Offline, `npm run doctor` checks:
+
+- Node.js 24 or later
+- the bearer token: present, at least 32 characters, and random enough (not a repeated character)
+- the policy folder: set and exists (the service needs the folder, not files in it)
+- the public key file: holds a public Ed25519 key, not a private key, and matches the pinned fingerprint if one is set
+- the connector manifest, and that its upstream credential is set
+- the release audience: present and https, and equal to the pinned audience if one is set
+- the nonce store, the port and the timeout
+- every `PARMANA_` setting: a name no component reads is reported, with the closest real name as a suggestion
+
+With `--online`, it also checks the key against parmana-core, the clock against parmana-core's, and the database: reachable, the nonce table present, and INSERT and DELETE granted to the database user. The privilege check reads the grants only, and writes no rows.
+
+### Online checks
+
+`npm run doctor` works offline. Add `--online` to also check against parmana-core and the database:
+
+```bash
+npm run doctor -- --online
+```
+
+- **parmana-core key.** Fetches the key parmana-core publishes for `PARMANA_CORE_KEY_ID` (default `default`) from `PARMANA_CORE_URL`, and compares it with `PARMANA_PUBLIC_KEY_FILE`. Set `PARMANA_CORE_URL` to the parmana-core API, not another site.
+- **Clock.** Compares this machine's clock with the `Date` header parmana-core sends. A difference over 30 seconds fails.
+- **Database.** Connects to `PARMANA_DATABASE_URL` and checks that the nonce table exists. Only the error code is printed, never the connection string.
+
+Online checks that cannot run because a setting is missing show a warning, not a failure.
+
+### What doctor still does not check
+
+- **Other database permissions.** `--online` confirms the database is reachable, the table exists, and INSERT and DELETE are granted. It does not check any other privilege.
+- **Clock accuracy.** The clock is compared with parmana-core's, which is good enough to catch drift. It is not checked against a time source you trust. Keep automatic time sync on.
+- **Registration.** `doctor` does not check that the connector is registered in parmana-core. That is a step in the registration flow, not a configuration value.
 
 ## Deploying
 
