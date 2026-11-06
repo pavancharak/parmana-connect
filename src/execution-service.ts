@@ -217,6 +217,23 @@ export function createExecutionService(options: ExecutionServiceOptions) {
       return send(res, 403, { error: "authorization does not cover this action" });
     }
 
+    // One execution per businessTransactionId, whatever the nonce. Two
+    // distinct authorizations for the same transaction share this claim, so
+    // the second one gets the first answer and the connector does not run again.
+    const claim = await releaseLedger.claim(
+      request.businessTransactionId,
+      request.authorization.payload.expiresAt,
+    );
+    if (!claim.claimed) {
+      if (claim.answer !== undefined) {
+        const stored = claim.answer as { status: number; body: Record<string, unknown> };
+        return send(res, stored.status, stored.body);
+      }
+      return send(res, 409, { error: "this transaction is already being executed; retry later" });
+    }
+
+    let status: number;
+    let answerBody: Record<string, unknown>;
     try {
       const response = await options.connector.execute(
         { capability: request.action, parameters: request.parameters },
@@ -229,7 +246,8 @@ export function createExecutionService(options: ExecutionServiceOptions) {
           timeoutMs: options.timeoutMs ?? 10_000,
         },
       );
-      return send(res, 200, {
+      status = 200;
+      answerBody = {
         businessTransactionId: request.businessTransactionId,
         action: request.action,
         target: request.target,
@@ -237,10 +255,19 @@ export function createExecutionService(options: ExecutionServiceOptions) {
         success: response.success,
         executedAt: new Date().toISOString(),
         metadata: response.metadata,
-      });
+      };
     } catch (err) {
-      return send(res, connectorStatus(err), { error: connectorMessage(err) });
+      status = connectorStatus(err);
+      answerBody = { error: connectorMessage(err) };
     }
+
+    try {
+      await releaseLedger.complete(request.businessTransactionId, { status, body: answerBody });
+    } catch {
+      // The connector has run and the answer is in hand. A repeat finds the claim without
+      // an answer and gets 409, so nothing runs twice. The operator resolves it.
+    }
+    return send(res, status, answerBody);
   };
 
   return {
