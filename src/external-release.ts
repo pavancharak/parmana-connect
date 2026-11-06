@@ -29,6 +29,13 @@ const COMMITMENT_PREFIX = Buffer.from("PARMANA-ED25519-LARGE-MESSAGE-V1\0", "utf
 /** How far the clock may be behind before an expired release is refused, in milliseconds. */
 const CLOCK_SKEW_MS = 30_000;
 
+/**
+ * Longest lifetime a release may have, from issuedAt to expiresAt. parmana-core
+ * issues releases with a 60 s TTL (EXTERNAL_RELEASE_TTL_MS in
+ * execution-gateway) and only shortens them, so a longer one was not issued by it.
+ */
+const MAX_RELEASE_LIFETIME_MS = 60_000;
+
 export interface ExternalRelease {
   readonly version: 1;
   readonly connectorId: string;
@@ -113,14 +120,33 @@ export async function checkExternalRelease(
     );
   }
 
+  const issuedAt =
+    typeof release.issuedAt === "string"
+      ? Date.parse(release.issuedAt)
+      : Number.NaN;
   const expiresAt =
     typeof release.expiresAt === "string"
       ? Date.parse(release.expiresAt)
       : Number.NaN;
+  if (Number.isNaN(issuedAt)) {
+    errors.push("release.issuedAt is not a date");
+  } else if (issuedAt > options.now.getTime() + CLOCK_SKEW_MS) {
+    errors.push(`the release was issued in the future, at ${release.issuedAt}`);
+  }
   if (Number.isNaN(expiresAt)) {
     errors.push("release.expiresAt is not a date");
   } else if (options.now.getTime() > expiresAt + CLOCK_SKEW_MS) {
     errors.push(`the release expired at ${release.expiresAt}`);
+  }
+  if (!Number.isNaN(issuedAt) && !Number.isNaN(expiresAt)) {
+    const lifetime = expiresAt - issuedAt;
+    if (lifetime <= 0) {
+      errors.push("release.expiresAt must be after release.issuedAt");
+    } else if (lifetime > MAX_RELEASE_LIFETIME_MS) {
+      errors.push(
+        `the release lifetime is ${lifetime / 1000} s; the limit is ${MAX_RELEASE_LIFETIME_MS / 1000} s`,
+      );
+    }
   }
 
   if (errors.length > 0) {

@@ -168,8 +168,9 @@ function release(overrides: Partial<ExternalRelease> = {}): ExternalRelease {
     parameters: PARAMETERS,
     policy: { name: "policy-a", version: "1.0.0" },
     approvedBy: [],
-    issuedAt: "2026-10-29T05:59:00.000Z",
-    expiresAt: "2099-01-01T00:00:00.000Z",
+    // A 60 s window around now: the endpoint reads the real clock.
+    issuedAt: new Date(Date.now() - 30_000).toISOString(),
+    expiresAt: new Date(Date.now() + 30_000).toISOString(),
     ...overrides,
   };
 }
