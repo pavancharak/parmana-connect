@@ -8,6 +8,12 @@ It has three parts:
 2. **A connector service.** A Node.js server with one route, `POST /execute`. It accepts two kinds of request: a signed release from Parmana, and a signed authorization with a bearer token. It verifies the request, runs the manifest's call, and answers.
 3. **An MCP server.** It exposes each capability as a tool for an AI agent. Every tool call goes to Parmana's API first.
 
+## The role of this repository
+
+parmana-connect is the generic endpoint that receives an approved action from Parmana core and carries it out against an HTTP system. It checks each signed release (signature, audience, capability, expiry, and that the transaction has not run before), then runs the call its manifest describes. A new system needs a manifest, not connector code. It exposes each capability to an AI agent as an MCP tool, and each tool call goes through Parmana's API first.
+
+It does not decide policy, sign records, or hold the trust record. Those stay in core. It has a second, bearer-token request path that is open unless `PARMANA_RELEASE_ONLY=true` is set.
+
 ## How a request flows
 
 ```
