@@ -14,6 +14,7 @@
     "start": "node dist/main.js",
     "migrate": "node dist/migrate.js",
     "mcp": "node dist/mcp-main.js",
+    "mcp:http": "node dist/mcp-http-main.js",
     "doctor": "node dist/doctor-main.js"
   },
   "license": "Apache-2.0",

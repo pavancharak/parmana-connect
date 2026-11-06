@@ -85,8 +85,7 @@ function release(id: string): ExternalRelease {
     policy: { name: "policy-a", version: "1.0.0" },
     approvedBy: [],
     // A 60 s window around now: the endpoint reads the real clock.
-    issuedAt: new Date(Date.now() - 30_000).toISOString(),
-    expiresAt: new Date(Date.now() + 30_000).toISOString(),
+    ...releaseWindow(),
   };
 }
 
@@ -183,3 +182,9 @@ describe.skipIf(databaseUrl === undefined)("PostgresReleaseLedger", () => {
     expect(await ledger.claim("pg-test-2", expires)).toEqual({ claimed: false });
   });
 });
+
+/** One clock reading, so the window is exactly 60 s and never 60 s plus a millisecond. */
+function releaseWindow(): { issuedAt: string; expiresAt: string } {
+  const now = Date.now();
+  return { issuedAt: new Date(now - 30_000).toISOString(), expiresAt: new Date(now + 30_000).toISOString() };
+}

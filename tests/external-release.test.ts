@@ -296,8 +296,7 @@ describe("POST /execute with a signed release", () => {
     const body = signed(
       release({
         businessTransactionId: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
-        issuedAt: new Date(Date.now() - 30_000).toISOString(),
-        expiresAt: new Date(Date.now() + 30_000).toISOString(),
+        ...releaseWindow(),
       }),
     );
 
@@ -317,8 +316,7 @@ describe("POST /execute with a signed release", () => {
     const body = signed(
       release({
         businessTransactionId: "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
-        issuedAt: new Date(Date.now() - 30_000).toISOString(),
-        expiresAt: new Date(Date.now() + 30_000).toISOString(),
+        ...releaseWindow(),
       }),
     );
     const first = await post(body);
@@ -331,3 +329,9 @@ describe("POST /execute with a signed release", () => {
     expect(calls.length).toBe(before);
   });
 });
+
+/** One clock reading, so the window is exactly 60 s and never 60 s plus a millisecond. */
+function releaseWindow(): { issuedAt: string; expiresAt: string } {
+  const now = Date.now();
+  return { issuedAt: new Date(now - 30_000).toISOString(), expiresAt: new Date(now + 30_000).toISOString() };
+}
