@@ -37,8 +37,8 @@ function release(overrides: Partial<ExternalRelease> = {}): ExternalRelease {
     parameters: {},
     policy: { name: "httpbin-read", version: "1.0.0" },
     approvedBy: [],
-    issuedAt: "2026-10-29T05:59:00.000Z",
-    expiresAt: "2099-01-01T00:00:00.000Z",
+    issuedAt: "2026-10-29T05:59:30.000Z",
+    expiresAt: "2026-10-29T06:00:30.000Z",
     ...overrides,
   };
 }
@@ -132,14 +132,75 @@ describe("verifyExternalRelease", () => {
   });
 
   it("refuses an expired release, and allows the 30 second clock skew", async () => {
-    const expired = signed(release({ expiresAt: "2026-10-29T05:59:00.000Z" }));
+    const expired = signed(
+      release({
+        issuedAt: "2026-10-29T05:58:00.000Z",
+        expiresAt: "2026-10-29T05:59:00.000Z",
+      }),
+    );
     const check = await verifyExternalRelease(expired, options());
     expect(check.valid === false && check.errors[0]).toContain(
       "the release expired at",
     );
 
-    const inSkew = signed(release({ expiresAt: "2026-10-29T05:59:45.000Z" }));
+    const inSkew = signed(
+      release({
+        issuedAt: "2026-10-29T05:58:45.000Z",
+        expiresAt: "2026-10-29T05:59:45.000Z",
+      }),
+    );
     expect((await verifyExternalRelease(inSkew, options())).valid).toBe(true);
+  });
+
+  it("refuses a release issued in the future beyond the 30 second clock skew", async () => {
+    const future = signed(
+      release({
+        businessTransactionId: "22222222-3333-4444-8555-666666666666",
+        issuedAt: "2026-10-29T06:02:00.000Z",
+        expiresAt: "2026-10-29T06:03:00.000Z",
+      }),
+    );
+    const check = await verifyExternalRelease(future, options());
+    expect(check.valid === false && check.errors[0]).toContain(
+      "issued in the future",
+    );
+
+    const slightlyAhead = signed(
+      release({
+        businessTransactionId: "33333333-4444-4555-8666-777777777777",
+        issuedAt: "2026-10-29T06:00:20.000Z",
+        expiresAt: "2026-10-29T06:01:20.000Z",
+      }),
+    );
+    expect((await verifyExternalRelease(slightlyAhead, options())).valid).toBe(true);
+  });
+
+  it("refuses a release whose lifetime is longer than 60 seconds", async () => {
+    const long = signed(
+      release({
+        businessTransactionId: "44444444-5555-4666-8777-888888888888",
+        issuedAt: "2026-10-29T05:59:30.000Z",
+        expiresAt: "2026-10-29T06:00:31.000Z",
+      }),
+    );
+    const check = await verifyExternalRelease(long, options());
+    expect(check.valid === false && check.errors[0]).toContain(
+      "the release lifetime is 61 s; the limit is 60 s",
+    );
+  });
+
+  it("refuses a release whose expiresAt is not after issuedAt", async () => {
+    const inverted = signed(
+      release({
+        businessTransactionId: "55555555-6666-4777-8888-999999999999",
+        issuedAt: "2026-10-29T05:59:40.000Z",
+        expiresAt: "2026-10-29T05:59:30.000Z",
+      }),
+    );
+    const check = await verifyExternalRelease(inverted, options());
+    expect(check.valid === false && check.errors).toContain(
+      "release.expiresAt must be after release.issuedAt",
+    );
   });
 
   it("refuses a capability this endpoint does not serve, and leaves its replay record unused", async () => {
@@ -235,6 +296,8 @@ describe("POST /execute with a signed release", () => {
     const body = signed(
       release({
         businessTransactionId: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        issuedAt: new Date(Date.now() - 30_000).toISOString(),
+        expiresAt: new Date(Date.now() + 30_000).toISOString(),
       }),
     );
 
@@ -254,6 +317,8 @@ describe("POST /execute with a signed release", () => {
     const body = signed(
       release({
         businessTransactionId: "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
+        issuedAt: new Date(Date.now() - 30_000).toISOString(),
+        expiresAt: new Date(Date.now() + 30_000).toISOString(),
       }),
     );
     const first = await post(body);

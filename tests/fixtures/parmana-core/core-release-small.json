@@ -9,7 +9,7 @@
     "target": "items/123",
     "parameters": {
       "itemId": "123",
-      "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
       "unicode": "naïve ✓"
     },
     "policy": {
@@ -17,14 +17,14 @@
       "version": "1.0.0"
     },
     "approvedBy": [],
-    "issuedAt": "2026-10-29T05:59:00.000Z",
-    "expiresAt": "2099-01-01T00:00:00.000Z"
+    "issuedAt": "2026-10-29T05:59:30.000Z",
+    "expiresAt": "2026-10-29T06:00:30.000Z"
   },
   "signature": {
     "algorithm": "ed25519",
     "keyId": "default",
-    "value": "cyiU6x45DGwdQ1PIIAJKmKQgL4Ojo9TYoEfpwep2FTZ/Z93+1QOTQU5aQk08YBzQGKkNIdlXz7t9LLSMQVM8BQ=="
+    "value": "Qdqvr0g66+csbXjMCvrI+esAV7j6ux7vhi0TQ6nPYN9o04avD1xP8IexoLhujduj2yPSlYwUN83GR11fqwUVBw=="
   },
-  "bytes": 564,
+  "bytes": 544,
   "commitment": false
 }
