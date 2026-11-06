@@ -40,6 +40,19 @@ Limits that apply to every call:
 - The read-must-use-`GET` rule is in pull request #36 and is not yet on `main`.
 - This path has not yet been run against a deployed parmana-core (G-133).
 
+## Release checks
+
+A signed release from parmana-core runs only if every check below passes:
+
+- Its signature verifies against the trusted key, and it names the default key.
+- Its `audience` is this endpoint.
+- Its `capability` is in the manifest.
+- Its `issuedAt` is no more than 30 seconds in the future.
+- Its `expiresAt` has not passed, allowing 30 seconds of clock difference.
+- Its `expiresAt` is after its `issuedAt`, and the lifetime is at most 60 seconds.
+
+parmana-core issues every release with a 60-second lifetime and only shortens it, so a longer one was not issued by it. A release whose `businessTransactionId` has already run gets its first answer back and does not run again.
+
 ## Quick start
 
 Requires Node.js 24 or later.
