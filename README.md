@@ -37,7 +37,7 @@ Limits that apply to every call:
 - The upstream response is capped at 1 MB, and redirects are refused.
 - Results over 16 KB are refused by parmana-core, so the service returns an error instead.
 - The default upstream timeout is 10 seconds.
-- The read-must-use-`GET` rule is in pull request #36 and is not yet on `main`.
+- A read capability must use `GET`. The manifest refuses any other method (PR #36).
 - This path has not yet been run against a deployed parmana-core (G-133).
 
 ## Release checks
