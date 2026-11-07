@@ -17,6 +17,8 @@ The Render service still accepts the bearer path until the new code is deployed 
 
 ## Open
 
+- **Node version range.** `package.json` `engines.node` is `>=24`, which allows a newer major than the one tested. parmana-core pinned its range to `24.x` on 2026-11-07 (PR #489). The same change here would keep the connector on the tested major. Needs a decision, then one change to `engines` and the CI pin together.
+
 - **No live run between parmana-core and this connector.** External registration needs a public HTTPS endpoint, and this connector cannot be registered from a local machine. The fixture tests use parmana-core's source, not a running instance. Closing it needs either a public endpoint for the connector or a decision to deploy it for this purpose.
 - **Production public key not installed or pinned.** `PARMANA_EXPECTED_KEY_FINGERPRINT` is unset, so the connector accepts any release signed by the key it was given. Closing it needs parmana-core's public key fingerprint, confirmed through a second channel, set on the connector.
 - **One shared token for the MCP server.** The MCP HTTP mode uses one bearer token for every client. Per-client tokens are an open decision.
