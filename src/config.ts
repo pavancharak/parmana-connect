@@ -71,7 +71,12 @@ export function loadServiceConfig(
   const databaseUrl = nonceStore === "postgres" ? required(env, "PARMANA_DATABASE_URL") : undefined;
 
   const releaseAudience = optionalHttpsUrl(env, "PARMANA_RELEASE_AUDIENCE");
-  const releaseOnly = parseBoolean(env.PARMANA_RELEASE_ONLY, "PARMANA_RELEASE_ONLY");
+  // Release-only by default (PC-006): the bearer-token route is a second path to the
+  // connector that does not bind the authorization to a connector identity. It is
+  // opened only by setting PARMANA_RELEASE_ONLY=false explicitly.
+  const releaseOnly = env.PARMANA_RELEASE_ONLY === undefined || env.PARMANA_RELEASE_ONLY === ""
+    ? true
+    : parseBoolean(env.PARMANA_RELEASE_ONLY, "PARMANA_RELEASE_ONLY");
   if (releaseOnly && releaseAudience === undefined) {
     throw new ConfigError("PARMANA_RELEASE_ONLY=true requires PARMANA_RELEASE_AUDIENCE, or every request would be refused");
   }
