@@ -15,7 +15,7 @@ import { ParmanaUnavailableError } from "./parmana-client.js";
  */
 export function createMcpServer(manifest: Manifest, ctx: ToolContext): Server {
   const server = new Server(
-    { name: `parmana-connect-${manifest.system}`, version: "0.0.0" },
+    { name: `parmana-connect-${manifest.system}`, version: "2.0.0" },
     { capabilities: { tools: {} } },
   );
 
