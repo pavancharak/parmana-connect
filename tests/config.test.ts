@@ -57,7 +57,7 @@ function refusal(overrides: Record<string, string | undefined>): string {
 
 describe("loadServiceConfig", () => {
   it("accepts a complete configuration and applies the defaults", () => {
-    const config = loadServiceConfig(env(), readers);
+    const config = loadServiceConfig(env({ PARMANA_RELEASE_ONLY: "false" }), readers);
 
     expect(config.port).toBe(8080);
     expect(config.timeoutMs).toBe(10_000);
@@ -68,7 +68,7 @@ describe("loadServiceConfig", () => {
   });
 
   it("uses the memory store only when it is asked for by name, and then needs no database", () => {
-    const config = loadServiceConfig(env({ PARMANA_NONCE_STORE: "memory", PARMANA_DATABASE_URL: undefined }), readers);
+    const config = loadServiceConfig(env({ PARMANA_NONCE_STORE: "memory", PARMANA_DATABASE_URL: undefined, PARMANA_RELEASE_ONLY: "false" }), readers);
 
     expect(config.nonceStore).toBe("memory");
     expect(config.databaseUrl).toBeUndefined();

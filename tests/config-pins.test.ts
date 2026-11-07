@@ -62,7 +62,7 @@ describe("startup pins", () => {
   });
 
   it("refuses to start when an audience is pinned but none is set", () => {
-    expect(() => loadServiceConfig(env({ PARMANA_RELEASE_AUDIENCE: undefined, PARMANA_EXPECTED_AUDIENCE: AUDIENCE }), readers)).toThrow(/PARMANA_RELEASE_AUDIENCE is not/);
+    expect(() => loadServiceConfig(env({ PARMANA_RELEASE_AUDIENCE: undefined, PARMANA_EXPECTED_AUDIENCE: AUDIENCE, PARMANA_RELEASE_ONLY: "false" }), readers)).toThrow(/PARMANA_RELEASE_AUDIENCE is not/);
   });
 
   it("does not print the secret or the bearer token in a pin error", () => {
