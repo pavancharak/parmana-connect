@@ -187,9 +187,11 @@ export function createExecutionService(options: ExecutionServiceOptions) {
       return send(res, 400, { error: "request is missing a required field" });
     }
 
-    // Signature, expiry, TTL and the nonce. The nonce is consumed here.
-    const envelope = await verifier.verify(request.authorization);
-    if (!envelope.valid) {
+    // Signature, expiry and TTL. These have no side effect, so they run first.
+    // The nonce is consumed later, once every other check has passed: a forged
+    // or tampered request must not use up a valid authorization's nonce.
+    const envelope = await verifier.verifyChecks(request.authorization);
+    if (!envelope.passed) {
       return send(res, 403, { error: "authorization invalid", checks: envelope.checks });
     }
 
@@ -215,6 +217,16 @@ export function createExecutionService(options: ExecutionServiceOptions) {
     // Fail closed: the authorization must name this action.
     if (request.authorization.payload.grantedCapability !== request.action) {
       return send(res, 403, { error: "authorization does not cover this action" });
+    }
+
+    // Consume the nonce last. Every side-effect-free check has passed, so this
+    // is the first and only use of the authorization.
+    const nonceUnseen = await verifier.consumeNonce(request.authorization);
+    if (!nonceUnseen) {
+      return send(res, 403, {
+        error: "authorization invalid",
+        checks: { ...envelope.checks, nonceUnseen: false },
+      });
     }
 
     // One execution per businessTransactionId, whatever the nonce. Two
