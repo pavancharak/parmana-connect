@@ -205,6 +205,16 @@ describe("execution service", () => {
     expect(upstreamCalls).toHaveLength(1);
   });
 
+  it("does not let a tampered request use up the authorization, so the legitimate request still runs", async () => {
+    const { signed } = await authorize();
+    const tampered = await post(body(signed, { itemId: "999" }));
+    const legitimate = await post(body(signed));
+
+    expect(tampered.status).toBe(403);
+    expect(legitimate.status).toBe(200);
+    expect(upstreamCalls).toHaveLength(1);
+  });
+
   it("runs the connector once for two distinct authorizations of the same transaction", async () => {
     // Each authorize() call has its own decision and nonce, so both pass the
     // envelope checks. Only the business transaction ID is shared.
@@ -222,7 +232,7 @@ describe("execution service", () => {
   });
 
   it("does not let a refused request use up the transaction, so a valid one still runs", async () => {
-    // Separate authorizations: a refused request still uses up its nonce.
+    // Separate authorizations: each request is checked on its own.
     const refused = await authorize();
     const approved = await authorize();
     const tampered = await post(body(refused.signed, { itemId: "999" }));
