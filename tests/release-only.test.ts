@@ -58,8 +58,12 @@ function configEnv(extra: Record<string, string | undefined>): Record<string, st
 }
 
 describe("PARMANA_RELEASE_ONLY configuration", () => {
-  it("is off when unset", () => {
-    expect(loadServiceConfig(configEnv({}), readers).releaseOnly).toBe(false);
+  it("is on when unset, because release-only is the default (PC-006)", () => {
+    expect(loadServiceConfig(configEnv({ PARMANA_RELEASE_AUDIENCE: AUDIENCE }), readers).releaseOnly).toBe(true);
+  });
+
+  it("is off only when set to false explicitly", () => {
+    expect(loadServiceConfig(configEnv({ PARMANA_RELEASE_ONLY: "false" }), readers).releaseOnly).toBe(false);
   });
 
   it("is on when set to true, with an audience", () => {
