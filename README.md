@@ -12,7 +12,7 @@ It has three parts:
 
 parmana-connect is the generic endpoint that receives an approved action from Parmana core and carries it out against an HTTP system. It checks each signed release (signature, audience, capability, expiry, and that the transaction has not run before), then runs the call its manifest describes. A new system needs a manifest, not connector code. It exposes each capability to an AI agent as an MCP tool, and each tool call goes through Parmana's API first.
 
-It does not decide policy, sign records, or hold the trust record. Those stay in core. It has a second, bearer-token request path that is open unless `PARMANA_RELEASE_ONLY=true` is set.
+It does not decide policy, sign records, or hold the trust record. Those stay in core. It has a second, bearer-token request path that is closed by default; `PARMANA_RELEASE_ONLY` defaults to `true`.
 
 ## How a request flows
 
@@ -36,7 +36,7 @@ Each capability in a manifest is a read or a write, set by its `effect`. Every c
 
 A capability runs only when Parmana releases it. The release is signed by parmana-core, so this service accepts it only if it verifies against the trusted key, names this endpoint as its audience, is unexpired, and names a capability in the manifest. A repeated release gets the first answer back, and the action does not run twice.
 
-The service also accepts a bearer token with a signed authorization. That path is refused when `PARMANA_RELEASE_ONLY=true`. The default is `false`, so the path is open until that setting is turned on (G-130).
+The service also accepts a bearer token with a signed authorization. That path is refused when `PARMANA_RELEASE_ONLY=true`. The default is `true`, so the path is closed unless `PARMANA_RELEASE_ONLY=false` is set explicitly (PC-006).
 
 Limits that apply to every call:
 
@@ -92,7 +92,7 @@ node --env-file=.env dist/main.js
 | `PARMANA_POLICY_DIR`           | Yes             | none        | An existing folder. Required by the crypto setup.                                                              |
 | `PARMANA_RELEASE_AUDIENCE`     | For releases    | unset       | The endpoint URL as registered in Parmana, for example `https://service.example.com/execute`. Must be `https`. |
 | `PARMANA_EXPECTED_KEY_FINGERPRINT` | No          | unset       | Pins the key. The service refuses to start unless the key in `PARMANA_PUBLIC_KEY_FILE` has this `sha256:` fingerprint. Use the value you confirmed through a second channel. |
-| `PARMANA_RELEASE_ONLY`          | No       | `false`. Set `true` to accept only signed releases from parmana-core. A bearer token plus a signed authorization is then refused, so no second route reaches the connector. Requires `PARMANA_RELEASE_AUDIENCE`. |
+| `PARMANA_RELEASE_ONLY`          | No       | `true` by default. Set `false` only to open the bearer-token route, which is not bound to a connector identity. A bearer token plus a signed authorization is then refused, so no second route reaches the connector. Requires `PARMANA_RELEASE_AUDIENCE`. |
 | `PARMANA_EXPECTED_AUDIENCE`    | No              | unset       | Pins the audience. The service refuses to start unless `PARMANA_RELEASE_AUDIENCE` equals this value exactly. |
 | `PARMANA_NONCE_STORE`          | No              | `postgres`  | `postgres` shares replay records and each release's first answer across instances. `memory` is for one instance only. Run `npm run migrate` to create both tables. |
 | `PARMANA_DATABASE_URL`         | With `postgres` | none        | Connection string for the replay store.                                                                        |
