@@ -20,7 +20,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
-    "@parmana/crypto": "0.1.1",
+    "@parmana/crypto": "2.0.3",
     "@parmana/envelope-verifier": "0.1.0",
     "@parmana/execution-system": "0.1.0",
     "@parmana/shared": "0.1.0",
