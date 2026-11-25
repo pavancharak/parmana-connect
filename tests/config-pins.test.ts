@@ -34,13 +34,24 @@ function env(overrides: Record<string, string | undefined> = {}): Record<string,
     EXAMPLE_TOKEN: "upstream-value",
     PARMANA_NONCE_STORE: "memory",
     PARMANA_RELEASE_AUDIENCE: AUDIENCE,
+    PARMANA_EXPECTED_KEY_FINGERPRINT: PINNED,
     ...overrides,
   };
 }
 
 describe("startup pins", () => {
-  it("starts when no pins are set, as before", () => {
-    expect(() => loadServiceConfig(env(), readers)).not.toThrow();
+  it("refuses to start with no key pin while release-only is on (G-134)", () => {
+    expect(() => loadServiceConfig(env({ PARMANA_EXPECTED_KEY_FINGERPRINT: undefined }), readers)).toThrow(ConfigError);
+    expect(() => loadServiceConfig(env({ PARMANA_EXPECTED_KEY_FINGERPRINT: "" }), readers)).toThrow(/PARMANA_EXPECTED_KEY_FINGERPRINT is required/);
+  });
+
+  it("starts with no key pin only when PARMANA_ALLOW_UNPINNED_KEY=true is set for local development", () => {
+    const local = env({ PARMANA_EXPECTED_KEY_FINGERPRINT: undefined, PARMANA_ALLOW_UNPINNED_KEY: "true" });
+    expect(() => loadServiceConfig(local, readers)).not.toThrow();
+  });
+
+  it("starts unpinned when release-only is off, as before", () => {
+    expect(() => loadServiceConfig(env({ PARMANA_EXPECTED_KEY_FINGERPRINT: undefined, PARMANA_RELEASE_ONLY: "false" }), readers)).not.toThrow();
   });
 
   it("starts when the key matches the pinned fingerprint", () => {

@@ -52,6 +52,7 @@ export const KNOWN_SETTINGS: readonly string[] = [
   "PARMANA_SERVICE_HOST",
   // doctor pins and online checks
   "PARMANA_EXPECTED_KEY_FINGERPRINT",
+  "PARMANA_ALLOW_UNPINNED_KEY",
   "PARMANA_EXPECTED_AUDIENCE",
   "PARMANA_CORE_URL",
   "PARMANA_CORE_KEY_ID",
@@ -152,6 +153,11 @@ function checkPublicKey(env: Env, readers: DoctorReaders): Check {
   const fingerprint = fingerprintOf(key);
   const expected = env.PARMANA_EXPECTED_KEY_FINGERPRINT;
   if (expected === undefined || expected === "") {
+    // G-134: the service refuses to start unpinned while release-only is on (the default).
+    const releaseOnly = env.PARMANA_RELEASE_ONLY === undefined || env.PARMANA_RELEASE_ONLY === "" || env.PARMANA_RELEASE_ONLY === "true";
+    if (releaseOnly && env.PARMANA_ALLOW_UNPINNED_KEY !== "true") {
+      return { name, level: "fail", message: `key fingerprint is ${fingerprint}, and no pin is set while release-only is on`, fix: "Set PARMANA_EXPECTED_KEY_FINGERPRINT to the fingerprint confirmed through a second channel" };
+    }
     return { name, level: "warn", message: `key fingerprint is ${fingerprint}, not compared`, fix: "Set PARMANA_EXPECTED_KEY_FINGERPRINT to the fingerprint you pinned, so doctor can compare it" };
   }
   if (expected !== fingerprint) {

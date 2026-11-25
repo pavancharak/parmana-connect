@@ -61,6 +61,18 @@ function check(checks: Check[], name: string): Check {
 }
 
 describe("doctor", () => {
+  it("fails the key check when no fingerprint is pinned while release-only is on (G-134)", () => {
+    const checks = runDoctor(env({ PARMANA_EXPECTED_KEY_FINGERPRINT: undefined }), readers);
+    expect(check(checks, "PARMANA_PUBLIC_KEY_FILE").level).toBe("fail");
+  });
+
+  it("only warns on an unpinned key when release-only is off or the local opt-out is set", () => {
+    const off = runDoctor(env({ PARMANA_EXPECTED_KEY_FINGERPRINT: undefined, PARMANA_RELEASE_ONLY: "false" }), readers);
+    expect(check(off, "PARMANA_PUBLIC_KEY_FILE").level).toBe("warn");
+    const local = runDoctor(env({ PARMANA_EXPECTED_KEY_FINGERPRINT: undefined, PARMANA_ALLOW_UNPINNED_KEY: "true" }), readers);
+    expect(check(local, "PARMANA_PUBLIC_KEY_FILE").level).toBe("warn");
+  });
+
   it("passes every check for a complete, correct environment", () => {
     const checks = runDoctor(env(), readers);
     expect(checks.filter((item) => item.level === "fail")).toEqual([]);
@@ -104,9 +116,9 @@ describe("doctor", () => {
     expect(result.message).toContain("does not match the pinned value");
   });
 
-  it("warns when no fingerprint is pinned, and shows the value to pin", () => {
+  it("fails when no fingerprint is pinned under release-only, and shows the value to pin", () => {
     const result = check(runDoctor(env({ PARMANA_EXPECTED_KEY_FINGERPRINT: undefined }), readers), "PARMANA_PUBLIC_KEY_FILE");
-    expect(result.level).toBe("warn");
+    expect(result.level).toBe("fail");
     expect(result.message).toContain(PINNED);
   });
 

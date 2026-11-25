@@ -84,9 +84,9 @@ The message "the key in PARMANA_PUBLIC_KEY_FILE is not the key parmana-core publ
 
 ## Pinning the key and the audience
 
-Until you pin them, doctor warns that the key and the audience were not compared. Pin them once you have confirmed the values:
+The key pin is required. While `PARMANA_RELEASE_ONLY` is on (the default), the service refuses to start without `PARMANA_EXPECTED_KEY_FINGERPRINT`, and doctor fails the key check. Only a local development run may leave it unset, with `PARMANA_ALLOW_UNPINNED_KEY=true`; never set that in production. The audience pin is optional: until you set it, doctor warns that the audience was not compared. Pin the values once you have confirmed them:
 
-- `PARMANA_EXPECTED_KEY_FINGERPRINT`: the `sha256:` fingerprint you confirmed.
+- `PARMANA_EXPECTED_KEY_FINGERPRINT`: the `sha256:` fingerprint you confirmed. See [runbooks/KEY-PIN-RUNBOOK.md](runbooks/KEY-PIN-RUNBOOK.md) for the full procedure.
 - `PARMANA_EXPECTED_AUDIENCE`: the URL registered in parmana-core, exactly.
 
 With these set, the service refuses to start on a mismatch. That is intended. A legitimate key rotation or audience change will stop the service until you update the pinned value after confirming the change.
@@ -108,23 +108,24 @@ With these set, the service refuses to start on a mismatch. That is intended. A 
 
 Every setting `doctor` reads, and what it does. Settings marked _service_ are read by the execution service too. _Doctor_ settings are read only by `doctor`, and only compare values.
 
-| Setting                            | Used by             | Required          | Default     | Meaning                                                                                                 |
-| ---------------------------------- | ------------------- | ----------------- | ----------- | ------------------------------------------------------------------------------------------------------- |
-| `PARMANA_SERVICE_BEARER_TOKEN`     | service             | yes               | none        | Shared secret that parmana-core sends. At least 32 characters, and at least 8 different characters.     |
-| `PARMANA_POLICY_DIR`               | service             | yes               | none        | A folder that exists. The service does not read policy files from it.                                   |
-| `PARMANA_PUBLIC_KEY_FILE`          | service             | yes               | none        | Path to Parmana's Ed25519 public key, in PEM. Never a private key.                                      |
-| `PARMANA_CONNECTOR_MANIFEST`       | service             | yes               | none        | Path to the connector manifest (JSON or YAML). Its `https` base URL is checked by the loader.           |
-| _upstream credential_              | service             | yes               | none        | The environment variable named by the manifest's `secretRef`. Its value is never printed.               |
-| `PARMANA_RELEASE_AUDIENCE`         | service             | for releases      | unset       | The endpoint URL registered in parmana-core. Must be `https`. Unset, every release is refused with 503. |
-| `PARMANA_NONCE_STORE`              | service             | no                | `postgres`  | `postgres` for shared deployments, `memory` for one local instance.                                     |
-| `PARMANA_DATABASE_URL`             | service             | with `postgres`   | none        | The replay database. Contains a password: never share it.                                               |
-| `PARMANA_SERVICE_PORT`             | service             | no                | `8080`      | Port, 1 to 65535.                                                                                       |
-| `PARMANA_SERVICE_HOST`             | service             | no                | `127.0.0.1` | Address to bind. Use `0.0.0.0` on a hosted service.                                                     |
-| `PARMANA_CONNECTOR_TIMEOUT_MS`     | service             | no                | `10000`     | Time limit for a connector call, 100 to 120000 ms.                                                      |
-| `PARMANA_EXPECTED_KEY_FINGERPRINT` | service and doctor  | no                | unset       | Pins the key. When set, the service refuses to start on a mismatch.                                     |
-| `PARMANA_EXPECTED_AUDIENCE`        | service and doctor  | no                | unset       | Pins the audience. When set, the service refuses to start unless `PARMANA_RELEASE_AUDIENCE` equals it.  |
-| `PARMANA_CORE_URL`                 | doctor (`--online`) | for online checks | unset       | parmana-core's base URL, for the key and clock comparison. Must be `https`.                             |
-| `PARMANA_CORE_KEY_ID`              | doctor (`--online`) | no                | `default`   | The key ID to fetch from parmana-core.                                                                  |
+| Setting                            | Used by             | Required                      | Default     | Meaning                                                                                                 |
+| ---------------------------------- | ------------------- | ----------------------------- | ----------- | ------------------------------------------------------------------------------------------------------- |
+| `PARMANA_SERVICE_BEARER_TOKEN`     | service             | yes                           | none        | Shared secret that parmana-core sends. At least 32 characters, and at least 8 different characters.     |
+| `PARMANA_POLICY_DIR`               | service             | yes                           | none        | A folder that exists. The service does not read policy files from it.                                   |
+| `PARMANA_PUBLIC_KEY_FILE`          | service             | yes                           | none        | Path to Parmana's Ed25519 public key, in PEM. Never a private key.                                      |
+| `PARMANA_CONNECTOR_MANIFEST`       | service             | yes                           | none        | Path to the connector manifest (JSON or YAML). Its `https` base URL is checked by the loader.           |
+| _upstream credential_              | service             | yes                           | none        | The environment variable named by the manifest's `secretRef`. Its value is never printed.               |
+| `PARMANA_RELEASE_AUDIENCE`         | service             | for releases                  | unset       | The endpoint URL registered in parmana-core. Must be `https`. Unset, every release is refused with 503. |
+| `PARMANA_NONCE_STORE`              | service             | no                            | `postgres`  | `postgres` for shared deployments, `memory` for one local instance.                                     |
+| `PARMANA_DATABASE_URL`             | service             | with `postgres`               | none        | The replay database. Contains a password: never share it.                                               |
+| `PARMANA_SERVICE_PORT`             | service             | no                            | `8080`      | Port, 1 to 65535.                                                                                       |
+| `PARMANA_SERVICE_HOST`             | service             | no                            | `127.0.0.1` | Address to bind. Use `0.0.0.0` on a hosted service.                                                     |
+| `PARMANA_CONNECTOR_TIMEOUT_MS`     | service             | no                            | `10000`     | Time limit for a connector call, 100 to 120000 ms.                                                      |
+| `PARMANA_EXPECTED_KEY_FINGERPRINT` | service and doctor  | yes, while release-only is on | unset       | Pins the key. The service refuses to start unset under release-only, and on a mismatch.                 |
+| `PARMANA_ALLOW_UNPINNED_KEY`       | service and doctor  | no                            | unset       | `true` allows an unpinned key under release-only. Local development only.                               |
+| `PARMANA_EXPECTED_AUDIENCE`        | service and doctor  | no                            | unset       | Pins the audience. When set, the service refuses to start unless `PARMANA_RELEASE_AUDIENCE` equals it.  |
+| `PARMANA_CORE_URL`                 | doctor (`--online`) | for online checks             | unset       | parmana-core's base URL, for the key and clock comparison. Must be `https`.                             |
+| `PARMANA_CORE_KEY_ID`              | doctor (`--online`) | no                            | `default`   | The key ID to fetch from parmana-core.                                                                  |
 
 Other `PARMANA_` names are read by the MCP server or the tests. `doctor` accepts them without a warning. Any other `PARMANA_` name is reported as a probable typo.
 
