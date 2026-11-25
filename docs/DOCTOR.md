@@ -52,23 +52,23 @@ The last line counts failures and warnings. A line starting with `fix:` says wha
 
 ## Each check, and what to do
 
-| Check | Fails when | What to do |
-| --- | --- | --- |
-| Node.js | Node is older than 24 | Install Node.js 24 or later, then run `npm ci` again. |
-| PARMANA_SERVICE_BEARER_TOKEN | Missing, shorter than 32 characters, or uses fewer than 8 different characters | Generate a new token with `openssl rand -hex 32` and set it in `.env`. Parmana-core must send the same value. |
-| PARMANA_POLICY_DIR | Missing, or the folder does not exist | Set it to a folder that exists. The service needs the folder, not files in it. Policies are held in parmana-core. |
-| PARMANA_PUBLIC_KEY_FILE | Missing, unreadable, not a key, not Ed25519, a private key, or not matching the pinned fingerprint | See "Fixing a key mismatch" below. If the file holds a private key, treat that private key as compromised. |
-| PARMANA_CONNECTOR_MANIFEST | Missing, unreadable, invalid, or its credential variable is not set | Correct the manifest at the path shown, and set the credential variable it names. |
-| PARMANA_RELEASE_AUDIENCE | Missing (every release is refused), not https, or not equal to the pinned audience | Set it to the exact URL registered in parmana-core, including the path, character for character. |
-| PARMANA_NONCE_STORE | Set to something other than `postgres` or `memory` | Use `postgres` for any shared deployment. `memory` is for one local instance only. |
-| PARMANA_DATABASE_URL | Missing, when the store is `postgres` | Set it to the replay database. Never share this line; it holds a password. |
-| port and timeout | A port or timeout value is out of range | Correct the value shown. |
-| (unknown setting) | A `PARMANA_` name that no component reads | Rename it to the suggested name, or remove it. The service ignores it otherwise. |
-| clock (offline) | Always a warning, because the clock cannot be checked offline | Use `--online`, or check the clock by hand. |
-| parmana-core | `PARMANA_CORE_URL` missing, not https, or the core cannot be reached | Set `PARMANA_CORE_URL` to parmana-core's address. If it fails only from Node, check for a proxy or a certificate Node does not trust. The message gives Node's error code. |
-| parmana-core key | Your key file is not the key parmana-core publishes | See "Fixing a key mismatch" below. |
-| clock (online) | This machine is more than 30 seconds from parmana-core | Turn on automatic time sync (Windows Time or NTP), then run again. |
-| database | Cannot connect, the nonce table is missing (warning), or INSERT and DELETE are not granted | Check `PARMANA_DATABASE_URL`, and grant INSERT and DELETE on `parmana_connect_nonces` to that user. The error code is shown; the connection string is not. |
+| Check                        | Fails when                                                                                         | What to do                                                                                                                                                                 |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js                      | Node is older than 24                                                                              | Install Node.js 24 or later, then run `npm ci` again.                                                                                                                      |
+| PARMANA_SERVICE_BEARER_TOKEN | Missing, shorter than 32 characters, or uses fewer than 8 different characters                     | Generate a new token with `openssl rand -hex 32` and set it in `.env`. Parmana-core must send the same value.                                                              |
+| PARMANA_POLICY_DIR           | Missing, or the folder does not exist                                                              | Set it to a folder that exists. The service needs the folder, not files in it. Policies are held in parmana-core.                                                          |
+| PARMANA_PUBLIC_KEY_FILE      | Missing, unreadable, not a key, not Ed25519, a private key, or not matching the pinned fingerprint | See "Fixing a key mismatch" below. If the file holds a private key, treat that private key as compromised.                                                                 |
+| PARMANA_CONNECTOR_MANIFEST   | Missing, unreadable, invalid, or its credential variable is not set                                | Correct the manifest at the path shown, and set the credential variable it names.                                                                                          |
+| PARMANA_RELEASE_AUDIENCE     | Missing (every release is refused), not https, or not equal to the pinned audience                 | Set it to the exact URL registered in parmana-core, including the path, character for character.                                                                           |
+| PARMANA_NONCE_STORE          | Set to something other than `postgres` or `memory`                                                 | Use `postgres` for any shared deployment. `memory` is for one local instance only.                                                                                         |
+| PARMANA_DATABASE_URL         | Missing, when the store is `postgres`                                                              | Set it to the replay database. Never share this line; it holds a password.                                                                                                 |
+| port and timeout             | A port or timeout value is out of range                                                            | Correct the value shown.                                                                                                                                                   |
+| (unknown setting)            | A `PARMANA_` name that no component reads                                                          | Rename it to the suggested name, or remove it. The service ignores it otherwise.                                                                                           |
+| clock (offline)              | Always a warning, because the clock cannot be checked offline                                      | Use `--online`, or check the clock by hand.                                                                                                                                |
+| parmana-core                 | `PARMANA_CORE_URL` missing, not https, or the core cannot be reached                               | Set `PARMANA_CORE_URL` to parmana-core's address. If it fails only from Node, check for a proxy or a certificate Node does not trust. The message gives Node's error code. |
+| parmana-core key             | Your key file is not the key parmana-core publishes                                                | See "Fixing a key mismatch" below.                                                                                                                                         |
+| clock (online)               | This machine is more than 30 seconds from parmana-core                                             | Turn on automatic time sync (Windows Time or NTP), then run again.                                                                                                         |
+| database                     | Cannot connect, the nonce table is missing (warning), or INSERT and DELETE are not granted         | Check `PARMANA_DATABASE_URL`, and grant INSERT and DELETE on `parmana_connect_nonces` to that user. The error code is shown; the connection string is not.                 |
 
 ## Fixing a key mismatch
 
@@ -106,25 +106,25 @@ With these set, the service refuses to start on a mismatch. That is intended. A 
 
 ## Settings reference
 
-Every setting `doctor` reads, and what it does. Settings marked *service* are read by the execution service too. *Doctor* settings are read only by `doctor`, and only compare values.
+Every setting `doctor` reads, and what it does. Settings marked _service_ are read by the execution service too. _Doctor_ settings are read only by `doctor`, and only compare values.
 
-| Setting | Used by | Required | Default | Meaning |
-| --- | --- | --- | --- | --- |
-| `PARMANA_SERVICE_BEARER_TOKEN` | service | yes | none | Shared secret that parmana-core sends. At least 32 characters, and at least 8 different characters. |
-| `PARMANA_POLICY_DIR` | service | yes | none | A folder that exists. The service does not read policy files from it. |
-| `PARMANA_PUBLIC_KEY_FILE` | service | yes | none | Path to Parmana's Ed25519 public key, in PEM. Never a private key. |
-| `PARMANA_CONNECTOR_MANIFEST` | service | yes | none | Path to the connector manifest (JSON or YAML). Its `https` base URL is checked by the loader. |
-| *upstream credential* | service | yes | none | The environment variable named by the manifest's `secretRef`. Its value is never printed. |
-| `PARMANA_RELEASE_AUDIENCE` | service | for releases | unset | The endpoint URL registered in parmana-core. Must be `https`. Unset, every release is refused with 503. |
-| `PARMANA_NONCE_STORE` | service | no | `postgres` | `postgres` for shared deployments, `memory` for one local instance. |
-| `PARMANA_DATABASE_URL` | service | with `postgres` | none | The replay database. Contains a password: never share it. |
-| `PARMANA_SERVICE_PORT` | service | no | `8080` | Port, 1 to 65535. |
-| `PARMANA_SERVICE_HOST` | service | no | `127.0.0.1` | Address to bind. Use `0.0.0.0` on a hosted service. |
-| `PARMANA_CONNECTOR_TIMEOUT_MS` | service | no | `10000` | Time limit for a connector call, 100 to 120000 ms. |
-| `PARMANA_EXPECTED_KEY_FINGERPRINT` | service and doctor | no | unset | Pins the key. When set, the service refuses to start on a mismatch. |
-| `PARMANA_EXPECTED_AUDIENCE` | service and doctor | no | unset | Pins the audience. When set, the service refuses to start unless `PARMANA_RELEASE_AUDIENCE` equals it. |
-| `PARMANA_CORE_URL` | doctor (`--online`) | for online checks | unset | parmana-core's base URL, for the key and clock comparison. Must be `https`. |
-| `PARMANA_CORE_KEY_ID` | doctor (`--online`) | no | `default` | The key ID to fetch from parmana-core. |
+| Setting                            | Used by             | Required          | Default     | Meaning                                                                                                 |
+| ---------------------------------- | ------------------- | ----------------- | ----------- | ------------------------------------------------------------------------------------------------------- |
+| `PARMANA_SERVICE_BEARER_TOKEN`     | service             | yes               | none        | Shared secret that parmana-core sends. At least 32 characters, and at least 8 different characters.     |
+| `PARMANA_POLICY_DIR`               | service             | yes               | none        | A folder that exists. The service does not read policy files from it.                                   |
+| `PARMANA_PUBLIC_KEY_FILE`          | service             | yes               | none        | Path to Parmana's Ed25519 public key, in PEM. Never a private key.                                      |
+| `PARMANA_CONNECTOR_MANIFEST`       | service             | yes               | none        | Path to the connector manifest (JSON or YAML). Its `https` base URL is checked by the loader.           |
+| _upstream credential_              | service             | yes               | none        | The environment variable named by the manifest's `secretRef`. Its value is never printed.               |
+| `PARMANA_RELEASE_AUDIENCE`         | service             | for releases      | unset       | The endpoint URL registered in parmana-core. Must be `https`. Unset, every release is refused with 503. |
+| `PARMANA_NONCE_STORE`              | service             | no                | `postgres`  | `postgres` for shared deployments, `memory` for one local instance.                                     |
+| `PARMANA_DATABASE_URL`             | service             | with `postgres`   | none        | The replay database. Contains a password: never share it.                                               |
+| `PARMANA_SERVICE_PORT`             | service             | no                | `8080`      | Port, 1 to 65535.                                                                                       |
+| `PARMANA_SERVICE_HOST`             | service             | no                | `127.0.0.1` | Address to bind. Use `0.0.0.0` on a hosted service.                                                     |
+| `PARMANA_CONNECTOR_TIMEOUT_MS`     | service             | no                | `10000`     | Time limit for a connector call, 100 to 120000 ms.                                                      |
+| `PARMANA_EXPECTED_KEY_FINGERPRINT` | service and doctor  | no                | unset       | Pins the key. When set, the service refuses to start on a mismatch.                                     |
+| `PARMANA_EXPECTED_AUDIENCE`        | service and doctor  | no                | unset       | Pins the audience. When set, the service refuses to start unless `PARMANA_RELEASE_AUDIENCE` equals it.  |
+| `PARMANA_CORE_URL`                 | doctor (`--online`) | for online checks | unset       | parmana-core's base URL, for the key and clock comparison. Must be `https`.                             |
+| `PARMANA_CORE_KEY_ID`              | doctor (`--online`) | no                | `default`   | The key ID to fetch from parmana-core.                                                                  |
 
 Other `PARMANA_` names are read by the MCP server or the tests. `doctor` accepts them without a warning. Any other `PARMANA_` name is reported as a probable typo.
 
@@ -159,10 +159,12 @@ gitleaks detect --source . --log-opts="origin/main..HEAD" --redact --no-banner -
 Exit code `0` means clean. Output is redacted; use `--report-format json --report-path report.json` to see the rule, file and line.
 
 Two findings have already happened in this repository:
+
 - A connection string with a password in a test fixture.
 - A fixed hex string assigned to a variable named `TOKEN`, which matches the generic API key rule.
 
 To avoid both:
+
 - Do not write `scheme://user:password@host` anywhere, even in tests. The test needs only the host.
 - Generate test secrets at run time, for example with `crypto.randomBytes`, rather than writing them as literals.
 - Do not add an allowlist entry unless the value is a documented, reviewed false positive. If you add one, keep it narrow: one exact value per entry, with a comment.
