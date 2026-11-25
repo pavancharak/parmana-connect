@@ -23,7 +23,7 @@
     "@parmana/crypto": "0.1.1",
     "@parmana/envelope-verifier": "0.1.0",
     "@parmana/execution-system": "0.1.0",
-    "@parmana/shared": "0.1.0",
+    "@parmana/shared": "2.0.3",
     "ajv": "^8.20.0",
     "pg": "^8.23.1",
     "yaml": "^2.9.1"
