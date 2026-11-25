@@ -84,9 +84,9 @@ The message "the key in PARMANA_PUBLIC_KEY_FILE is not the key parmana-core publ
 
 ## Pinning the key and the audience
 
-Until you pin them, doctor warns that the key and the audience were not compared. Pin them once you have confirmed the values:
+The key pin is required. While `PARMANA_RELEASE_ONLY` is on (the default), the service refuses to start without `PARMANA_EXPECTED_KEY_FINGERPRINT`, and doctor fails the key check. Only a local development run may leave it unset, with `PARMANA_ALLOW_UNPINNED_KEY=true`; never set that in production. The audience pin is optional: until you set it, doctor warns that the audience was not compared. Pin the values once you have confirmed them:
 
-- `PARMANA_EXPECTED_KEY_FINGERPRINT`: the `sha256:` fingerprint you confirmed.
+- `PARMANA_EXPECTED_KEY_FINGERPRINT`: the `sha256:` fingerprint you confirmed. See [runbooks/KEY-PIN-RUNBOOK.md](runbooks/KEY-PIN-RUNBOOK.md) for the full procedure.
 - `PARMANA_EXPECTED_AUDIENCE`: the URL registered in parmana-core, exactly.
 
 With these set, the service refuses to start on a mismatch. That is intended. A legitimate key rotation or audience change will stop the service until you update the pinned value after confirming the change.
@@ -121,7 +121,8 @@ Every setting `doctor` reads, and what it does. Settings marked *service* are re
 | `PARMANA_SERVICE_PORT` | service | no | `8080` | Port, 1 to 65535. |
 | `PARMANA_SERVICE_HOST` | service | no | `127.0.0.1` | Address to bind. Use `0.0.0.0` on a hosted service. |
 | `PARMANA_CONNECTOR_TIMEOUT_MS` | service | no | `10000` | Time limit for a connector call, 100 to 120000 ms. |
-| `PARMANA_EXPECTED_KEY_FINGERPRINT` | service and doctor | no | unset | Pins the key. When set, the service refuses to start on a mismatch. |
+| `PARMANA_EXPECTED_KEY_FINGERPRINT` | service and doctor | yes, while release-only is on | unset | Pins the key. The service refuses to start unset under release-only, and on a mismatch. |
+| `PARMANA_ALLOW_UNPINNED_KEY` | service and doctor | no | unset | `true` allows an unpinned key under release-only. Local development only. |
 | `PARMANA_EXPECTED_AUDIENCE` | service and doctor | no | unset | Pins the audience. When set, the service refuses to start unless `PARMANA_RELEASE_AUDIENCE` equals it. |
 | `PARMANA_CORE_URL` | doctor (`--online`) | for online checks | unset | parmana-core's base URL, for the key and clock comparison. Must be `https`. |
 | `PARMANA_CORE_KEY_ID` | doctor (`--online`) | no | `default` | The key ID to fetch from parmana-core. |

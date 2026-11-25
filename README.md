@@ -133,7 +133,7 @@ Offline, `npm run doctor` checks:
 - Node.js 24 or later
 - the bearer token: present, at least 32 characters, and random enough (not a repeated character)
 - the policy folder: set and exists (the service needs the folder, not files in it)
-- the public key file: holds a public Ed25519 key, not a private key, and matches the pinned fingerprint if one is set
+- the public key file: holds a public Ed25519 key, not a private key, and matches the pinned fingerprint (required while release-only is on)
 - the connector manifest, and that its upstream credential is set
 - the release audience: present and https, and equal to the pinned audience if one is set
 - the nonce store, the port and the timeout
