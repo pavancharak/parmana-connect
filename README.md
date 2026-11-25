@@ -91,7 +91,8 @@ node --env-file=.env dist/main.js
 | The manifest's `secretRef`     | Yes             | none        | The environment variable holding the upstream credential.                                                      |
 | `PARMANA_POLICY_DIR`           | Yes             | none        | An existing folder. Required by the crypto setup.                                                              |
 | `PARMANA_RELEASE_AUDIENCE`     | For releases    | unset       | The endpoint URL as registered in Parmana, for example `https://service.example.com/execute`. Must be `https`. |
-| `PARMANA_EXPECTED_KEY_FINGERPRINT` | No          | unset       | Pins the key. The service refuses to start unless the key in `PARMANA_PUBLIC_KEY_FILE` has this `sha256:` fingerprint. Use the value you confirmed through a second channel. |
+| `PARMANA_EXPECTED_KEY_FINGERPRINT` | Yes, while `PARMANA_RELEASE_ONLY` is on | unset | Pins the key. The service refuses to start unless the key in `PARMANA_PUBLIC_KEY_FILE` has this `sha256:` fingerprint. Use the value you confirmed through a second channel. |
+| `PARMANA_ALLOW_UNPINNED_KEY` | No | unset | Set to `true` only for local development, to start with release-only on and no key pin. Never set it in production. |
 | `PARMANA_RELEASE_ONLY`          | No       | `true` by default. Set `false` only to open the bearer-token route, which is not bound to a connector identity. A bearer token plus a signed authorization is then refused, so no second route reaches the connector. Requires `PARMANA_RELEASE_AUDIENCE`. |
 | `PARMANA_EXPECTED_AUDIENCE`    | No              | unset       | Pins the audience. The service refuses to start unless `PARMANA_RELEASE_AUDIENCE` equals this value exactly. |
 | `PARMANA_NONCE_STORE`          | No              | `postgres`  | `postgres` shares replay records and each release's first answer across instances. `memory` is for one instance only. Run `npm run migrate` to create both tables. |
@@ -123,7 +124,7 @@ Start the MCP server with `npm run mcp`.
 
 Run `npm run doctor` before starting the service. It runs every configuration check and lists all the problems at once, each with a fix. It never prints a secret value.
 
-Set `PARMANA_EXPECTED_KEY_FINGERPRINT` and `PARMANA_EXPECTED_AUDIENCE` to pin the key and the audience. With those set, the service refuses to start when either differs from the pinned value. Without them, `doctor` warns that the values were not compared, and the service starts as before.
+Set `PARMANA_EXPECTED_KEY_FINGERPRINT` and `PARMANA_EXPECTED_AUDIENCE` to pin the key and the audience. With those set, the service refuses to start when either differs from the pinned value. The key pin is required while release-only is on (the default), so the service refuses to start without it. The audience pin stays optional: without it, `doctor` warns that the audience was not compared.
 
 ### What doctor checks
 

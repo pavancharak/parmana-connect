@@ -11,6 +11,7 @@ import { MemoryNonceStore } from "@parmana/envelope-verifier";
 import { toExecutableContent } from "@parmana/shared";
 
 import { ConfigError, loadServiceConfig } from "../src/config.js";
+import { fingerprintOf } from "../src/fingerprint.js";
 import { createGenericConnector } from "../src/connector.js";
 import { createExecutionService } from "../src/execution-service.js";
 import type { ExternalRelease, SignedExternalRelease } from "../src/external-release.js";
@@ -53,6 +54,7 @@ function configEnv(extra: Record<string, string | undefined>): Record<string, st
     PARMANA_CONNECTOR_MANIFEST: "/manifest.json",
     EXAMPLE_TOKEN: "x",
     PARMANA_NONCE_STORE: "memory",
+    PARMANA_EXPECTED_KEY_FINGERPRINT: fingerprintOf(configPublic),
     ...extra,
   };
 }
