@@ -18,7 +18,7 @@ The Render service still accepts the bearer path until the new code is deployed 
 ## Open
 
 - **No live run between parmana-core and this connector.** External registration needs a public HTTPS endpoint, and this connector cannot be registered from a local machine. The fixture tests use parmana-core's source, not a running instance. Closing it needs either a public endpoint for the connector or a decision to deploy it for this purpose.
-- **Production public key not installed or pinned.** `PARMANA_EXPECTED_KEY_FINGERPRINT` is unset, so the connector accepts any release signed by the key it was given. Closing it needs parmana-core's public key fingerprint, confirmed through a second channel, set on the connector.
+- **Production public key not installed or pinned (G-134).** Code: on branch `claude/g-134-pin-connector-key` (commit `13d17e5`), the service refuses to start under release-only without `PARMANA_EXPECTED_KEY_FINGERPRINT`, and doctor fails the same case. Not closed: the production fingerprint has not been confirmed through a second channel and set on the deployed connector. Steps: [runbooks/KEY-PIN-RUNBOOK.md](runbooks/KEY-PIN-RUNBOOK.md).
 - **One shared token for the MCP server.** The MCP HTTP mode uses one bearer token for every client. Per-client tokens are an open decision.
 
 ## Node version

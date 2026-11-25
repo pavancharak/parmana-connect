@@ -88,6 +88,15 @@ export function loadServiceConfig(
       "PARMANA_EXPECTED_KEY_FINGERPRINT does not match the key in PARMANA_PUBLIC_KEY_FILE. Check the key, or update the pinned value after confirming a rotation",
     );
   }
+  // G-134: a release-only service trusts whatever key PARMANA_PUBLIC_KEY_FILE holds, so a
+  // replaced key file would start unnoticed. Release-only therefore needs the pin. A local
+  // development run opts out explicitly with PARMANA_ALLOW_UNPINNED_KEY=true.
+  const hasFingerprintPin = expectedFingerprint !== undefined && expectedFingerprint !== "";
+  if (releaseOnly && !hasFingerprintPin && env.PARMANA_ALLOW_UNPINNED_KEY !== "true") {
+    throw new ConfigError(
+      "PARMANA_EXPECTED_KEY_FINGERPRINT is required while PARMANA_RELEASE_ONLY is on. Set it to the sha256 fingerprint of the Parmana public key, confirmed through a second channel. Local development only: PARMANA_ALLOW_UNPINNED_KEY=true",
+    );
+  }
   const expectedAudience = env.PARMANA_EXPECTED_AUDIENCE;
   if (expectedAudience !== undefined && expectedAudience !== "") {
     if (releaseAudience === undefined) {
