@@ -5,7 +5,7 @@
 It has three parts:
 
 1. **A connector manifest.** A YAML or JSON file that describes an HTTP system and its capabilities, such as `httpbin:get`. A manifest needs no connector code.
-2. **A connector service.** A Node.js server with one route, `POST /execute`. It accepts two kinds of request: a signed release from Parmana, and a signed authorization with a bearer token. It verifies the request, runs the manifest's call, and answers.
+2. **A connector service.** A Node.js server with one route that does work, `POST /execute`, plus `GET /health`. It accepts two kinds of request: a signed release from Parmana, and a signed authorization with a bearer token. It verifies the request, runs the manifest's call, and answers.
 3. **An MCP server.** It exposes each capability as a tool for an AI agent. Every tool call goes to Parmana's API first.
 
 ## The role of this repository
