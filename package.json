@@ -21,7 +21,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@parmana/crypto": "0.1.1",
-    "@parmana/envelope-verifier": "0.1.0",
+    "@parmana/envelope-verifier": "5.0.0",
     "@parmana/execution-system": "0.1.0",
     "@parmana/shared": "5.0.0",
     "ajv": "^8.20.0",
